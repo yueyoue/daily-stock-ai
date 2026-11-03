@@ -20,6 +20,22 @@ def to_records(df) -> list[dict]:
     return [dict(r) for r in df.to_dict("records")]
 
 
+def to_records_indexed(df) -> list[dict]:
+    """同 to_records，但日期等信息在**索引**上时先 reset_index（新浪/乐咕常见布局）。
+
+    pandas to_dict("records") 会静默丢索引（无列时甚至返回空列表）；
+    首行缺日期列或为空时重取一次。
+    """
+    rows = to_records(df)
+    if hasattr(df, "reset_index") and (
+        not rows or not any(k in rows[0] for k in ("date", "日期", "datetime", "REPORT_DATE"))
+    ):
+        reset_rows = to_records(df.reset_index())
+        if reset_rows:
+            rows = reset_rows
+    return rows
+
+
 def to_date(value) -> date | None:
     """日期归一：date/datetime/字符串（YYYY-MM-DD、YYYYMMDD、含时间）→ date。"""
     if value is None:

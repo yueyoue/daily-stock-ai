@@ -17,6 +17,32 @@ class FakeEchoCollector:
         return [{"params": params}]
 
 
+class FakeMarketDataCollector:
+    """假大盘汇总采集器（T1.9）：params_template 传 kind 区分三条线。"""
+
+    calls: list = []
+    fail_kinds: set = set()
+
+    @classmethod
+    def reset(cls):
+        cls.calls = []
+        cls.fail_kinds = set()
+
+    def fetch(self, **params):
+        FakeMarketDataCollector.calls.append(dict(params))
+        kind = params.get("kind")
+        if kind in FakeMarketDataCollector.fail_kinds:
+            raise RuntimeError(f"模拟 {kind} 线失效")
+        d = params.get("date", "2026-11-03")
+        if kind == "moneyflow":
+            return [{"date": d, "main_moneyflow": 123.4, "extra": {"超大单净流入": 50.0}}]
+        if kind == "limit":
+            return [{"date": d, "limit_up_count": 42, "limit_down_count": 7,
+                     "extra": {"连板梯队": {"1板": 30, "2板": 8, "3板": 4}, "最高连板": 3}}]
+        return [{"date": d, "up_count": 3000, "down_count": 2000,
+                 "extra": {"flat_count": 200}}]
+
+
 class FakeFinanceCollector:
     """可配置假财务采集器（T1.8）。"""
 
