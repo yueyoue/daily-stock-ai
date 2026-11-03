@@ -7,11 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, RedirectResponse
 
 from app.api.auth import router as auth_router
+from app.api.backtest import router as backtest_router
 from app.api.collect import router as collect_router
 from app.api.dashboard import router as dashboard_router
 from app.api.deps import require_user
 from app.api.health import router as health_router
 from app.api.report import router as report_router
+from app.api.selector import router as selector_router
 from app.core.auth import install_auth_middleware, seed_admin
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -68,6 +70,8 @@ app.include_router(auth_router)
 app.include_router(collect_router, dependencies=[Depends(require_user)])
 app.include_router(dashboard_router, dependencies=[Depends(require_user)])
 app.include_router(report_router, dependencies=[Depends(require_user)])
+app.include_router(selector_router, dependencies=[Depends(require_user)])
+app.include_router(backtest_router, dependencies=[Depends(require_user)])
 
 
 @app.get("/docs", include_in_schema=False)

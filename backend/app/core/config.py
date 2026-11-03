@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     # 技术指标入库开关（开发文档 §5.4：模式 A 写库每日增量；默认关=模式 B 缓存）
     tech_indicator_store: bool = False
 
+    # 选股扫描预算（开发文档 §4 模块4：全市场扫描 ≤20s）
+    selector_scan_budget_s: float = 20.0
+
     # 前端产物目录（单镜像由后端托管，开发文档 §8.1）
     frontend_dist: str = "frontend/dist"
 
