@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DailyStockAI - AI投研工作台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            darkbg: '#0b1120',
+            darkcard: '#162138',
+            darkborder: '#273757',
+            primary: '#2563eb',
+            success: '#10b981',
+            danger: '#ef4444',
+            warning: '#f59e0b',
+            textmuted: '#94a3b8'
+          },
+          fontFamily: {
+            inter: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+      darkMode: 'class'
+    }
+  </script>
+  <style type="text/tailwindcss">
+    @layer utilities {
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      .card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+      .nav-active { @apply bg-primary/15 border-l-4 border-primary text-primary; }
+    }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+  </style>
+</head>
+<body class="bg-darkbg text-slate-100 font-inter min-h-screen flex overflow-hidden">
+  <!-- 侧边栏 -->
+  <aside id="sidebar" class="w-60 bg-darkcard border-r border-darkborder flex flex-col transition-all duration-300 flex-shrink-0">
+    <div class="h-16 flex items-center px-4 border-b border-darkborder">
+      <div class="w-8 h-8 rounded-lg bg-primary flex items-center justify-center mr-2">
+        <i class="fa fa-line-chart text-white"></i>
+      </div>
+      <span class="text-lg font-bold">DailyStockAI</span>
+    </div>
+    <nav class="flex-1 py-4 overflow-y-auto scrollbar-hide">
+      <div class="px-3 text-xs text-textmuted mb-2 uppercase tracking-wider">投研工作台</div>
+      <ul class="space-y-1 px-2">
+        <li><a data-page="dashboard" class="menu-item nav-active flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-dashboard w-5"></i>大盘仪表盘
+        </a></li>
+        <li><a data-page="morning" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-file-text-o w-5"></i>盘前早报
+        </a></li>
+        <li><a data-page="afternoon" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-bar-chart w-5"></i>盘后复盘
+        </a></li>
+        <li><a data-page="selector" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-filter w-5"></i>选股器
+        </a></li>
+        <li><a data-page="backtest" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-history w-5"></i>策略回测
+        </a></li>
+      </ul>
+      <div class="px-3 text-xs text-textmuted mt-6 mb-2 uppercase tracking-wider">素材库</div>
+      <ul class="space-y-1 px-2">
+        <li><a data-page="hot" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-fire w-5"></i>热点题材库
+        </a></li>
+        <li><a data-page="watch" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-star-o w-5"></i>掘金观察池
+        </a></li>
+        <li><a data-page="news" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-newspaper-o w-5"></i>资讯中心
+        </a></li>
+      </ul>
+      <div class="px-3 text-xs text-textmuted mt-6 mb-2 uppercase tracking-wider">系统</div>
+      <ul class="space-y-1 px-2">
+        <li><a data-page="task" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-tasks w-5"></i>任务监控
+        </a></li>
+        <li><a data-page="config" class="menu-item flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/40 transition">
+          <i class="fa fa-cog w-5"></i>系统配置
+        </a></li>
+      </ul>
+    </nav>
+    <div class="p-3 border-t border-darkborder text-xs text-textmuted">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>系统运行正常
+      </div>
+    </div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- 顶部栏 -->
+    <header class="h-16 bg-darkcard border-b border-darkborder flex items-center justify-between px-6">
+      <div class="flex items-center gap-4">
+        <button id="collapseBtn" class="text-slate-300 hover:text-white">
+          <i class="fa fa-bars text-xl"></i>
+        </button>
+        <div>
+          <span class="text-textmuted">交易日：</span>
+          <span id="tradeDate">2026-11-03</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-6">
+        <div class="text-sm">
+          <span class="text-textmuted">模型：</span>
+          <span class="text-primary">通义千问</span>
+        </div>
+        <div class="text-sm">
+          <span class="text-textmuted">采集任务：</span>
+          <span class="text-success">空闲</span>
+        </div>
+        <button class="px-3 py-1 rounded-lg bg-primary hover:bg-primary/90 text-sm transition">
+          <i class="fa fa-refresh mr-1"></i>手动触发采集
+        </button>
+      </div>
+    </header>
+
+    <!-- 页面容器 -->
+    <main class="flex-1 overflow-y-auto p-6 scrollbar-hide">
+      <!-- 大盘仪表盘 -->
+      <div class="page" id="page-dashboard">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">大盘仪表盘</h1>
+          <p class="text-textmuted mt-1">全市场情绪、资金、主线板块实时概览</p>
+        </div>
+        <div class="grid grid-cols-12 gap-4 mb-6">
+          <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="text-textmuted text-sm">市场情绪得分</div>
+            <div class="text-3xl font-bold mt-2 text-warning">64</div>
+            <div class="text-xs text-textmuted mt-1">中性偏强</div>
+          </div>
+          <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="text-textmuted text-sm">涨停家数</div>
+            <div class="text-3xl font-bold mt-2 text-success">32</div>
+            <div class="text-xs text-textmuted mt-1">连板：7家</div>
+          </div>
+          <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="text-textmuted text-sm">北向资金</div>
+            <div class="text-3xl font-bold mt-2 text-success">+28.6亿</div>
+            <div class="text-xs text-textmuted mt-1">当日净流入</div>
+          </div>
+          <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="text-textmuted text-sm">涨跌家数</div>
+            <div class="text-3xl font-bold mt-2">
+              <span class="text-success">2146</span> / <span class="text-danger">2782</span>
+            </div>
+            <div class="text-xs text-textmuted mt-1">上涨 / 下跌</div>
+          </div>
+        </div>
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-8 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-semibold">情绪趋势曲线</h3>
+              <select class="bg-darkbg border border-darkborder rounded px-2 py-1 text-sm">
+                <option>近20个交易日</option>
+                <option>近60个交易日</option>
+              </select>
+            </div>
+            <div class="h-60">
+              <canvas id="sentimentChart"></canvas>
+            </div>
+          </div>
+          <div class="col-span-4 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">主线板块资金</h3>
+            <div class="space-y-3">
+              <div>
+                <div class="flex justify-between text-sm"><span>算力</span><span class="text-success">+12.4亿</span></div>
+                <div class="w-full h-2 bg-darkbg rounded-full mt-1 overflow-hidden">
+                  <div class="h-full bg-success w-4/5"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>半导体</span><span class="text-success">+7.1亿</span></div>
+                <div class="w-full h-2 bg-darkbg rounded-full mt-1 overflow-hidden">
+                  <div class="h-full bg-success w-3/5"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>消费</span><span class="text-danger">-4.3亿</span></div>
+                <div class="w-full h-2 bg-darkbg rounded-full mt-1 overflow-hidden">
+                  <div class="h-full bg-danger w-2/5"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm"><span>新能源</span><span class="text-danger">-6.8亿</span></div>
+                <div class="w-full h-2 bg-darkbg rounded-full mt-1 overflow-hidden">
+                  <div class="h-full bg-danger w-3/5"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 盘前早报 -->
+      <div class="page hidden" id="page-morning">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">盘前早报</h1>
+          <p class="text-textmuted mt-1">交易日早8点自动生成，支持手动重生成</p>
+        </div>
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">历史报告</h3>
+            <div class="space-y-2 text-sm">
+              <div class="p-2 rounded bg-primary/15 border-l-2 border-primary">2026-11-03 早报</div>
+              <div class="p-2 rounded hover:bg-slate-700/30">2026-11-02 早报</div>
+              <div class="p-2 rounded hover:bg-slate-700/30">2026-10-30 早报</div>
+              <div class="p-2 rounded hover:bg-slate-700/30">2026-10-29 早报</div>
+            </div>
+            <div class="mt-6">
+              <button class="w-full py-2 rounded-lg border border-primary text-primary hover:bg-primary/10 transition text-sm">
+                <i class="fa fa-refresh mr-1"></i>重新生成当日报告
+              </button>
+            </div>
+          </div>
+          <div class="col-span-9 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="font-semibold">2026-11-03 盘前早报</h3>
+              <div class="flex gap-2">
+                <button class="px-3 py-1 text-sm rounded border border-darkborder hover:bg-slate-700/40">导出MD</button>
+                <button class="px-3 py-1 text-sm rounded border border-darkborder hover:bg-slate-700/40">导出PDF</button>
+              </div>
+            </div>
+            <div class="prose prose-invert max-w-none text-sm text-slate-300">
+              <p><strong>【速读摘要】</strong>隔夜外围小幅震荡，北向资金昨日回流，市场主线集中在算力与半导体，短期情绪中性偏强，注意高位股分化风险。</p>
+              <p><strong>【隔夜大事】</strong>海外科技财报落地，国内产业政策持续利好数字经济方向。</p>
+              <p><strong>【资金预判】</strong>预判北向小幅流入，短线资金继续围绕科技主线轮动。</p>
+              <p><strong>【风险提示】</strong>高位题材波动加大，回避纯情绪高位标的。</p>
+              <p><strong>【今日观察方向】</strong>算力、半导体设备、自主可控产业链。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 盘后复盘 -->
+      <div class="page hidden" id="page-afternoon">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">盘后复盘</h1>
+          <p class="text-textmuted mt-1">交易日17点自动生成，包含涨停梯队、主线验证、策略胜率</p>
+        </div>
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-8 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">当日复盘台账</h3>
+            <div class="prose prose-invert max-w-none text-sm text-slate-300">
+              <p>市场情绪得分：64，较上一交易日 +3</p>
+              <p>涨停梯队：3板1家，2板4家，首板27家</p>
+              <p>主线板块：算力板块全天资金流入居前，板块内多只标的涨停</p>
+              <p>策略验证：【低估值算力】策略今日信号胜率72%</p>
+              <p>次日观察计划：重点关注算力分支轮动机会，控制仓位</p>
+            </div>
+          </div>
+          <div class="col-span-4 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">复盘统计图表</h3>
+            <div class="h-56">
+              <canvas id="replayChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 选股器 -->
+      <div class="page hidden" id="page-selector">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">选股器</h1>
+          <p class="text-textmuted mt-1">组合财务、技术因子，全市场扫描，策略可保存</p>
+        </div>
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-4 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">条件配置</h3>
+            <div class="space-y-4 text-sm">
+              <div>
+                <label class="text-textmuted block mb-1">ROE(%)</label>
+                <input type="range" min="0" max="25" value="8" class="w-full">
+                <div class="flex justify-between"><span>0</span><span class="text-primary">≥8</span><span>25</span></div>
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1">毛利率(%)</label>
+                <input type="range" min="0" max="60" value="20" class="w-full">
+                <div class="flex justify-between"><span>0</span><span class="text-primary">≥20</span><span>60</span></div>
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1">MA5 > MA20</label>
+                <input type="checkbox" checked class="ml-2">
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1">流通市值（亿）</label>
+                <div class="flex gap-2">
+                  <input type="number" value="50" class="bg-darkbg border border-darkborder rounded w-1/2 px-2 py-1">
+                  <input type="number" value="500" class="bg-darkbg border border-darkborder rounded w-1/2 px-2 py-1">
+                </div>
+              </div>
+            </div>
+            <div class="mt-6 flex gap-2">
+              <button class="flex-1 py-2 rounded-lg bg-primary hover:bg-primary/90 transition text-sm">开始扫描</button>
+              <button class="flex-1 py-2 rounded-lg border border-darkborder hover:bg-slate-700/40 transition text-sm">保存策略</button>
+            </div>
+          </div>
+          <div class="col-span-8 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">选股结果（共14只）</h3>
+            <table class="w-full text-sm">
+              <thead class="text-textmuted border-b border-darkborder">
+                <tr>
+                  <th class="text-left py-2">代码</th>
+                  <th class="text-left py-2">名称</th>
+                  <th class="text-left py-2">ROE</th>
+                  <th class="text-left py-2">毛利率</th>
+                  <th class="text-left py-2">市值</th>
+                  <th class="text-left py-2">操作</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-darkborder">
+                <tr class="hover:bg-slate-700/20">
+                  <td>000xxx</td><td>标的A</td><td>12.6</td><td>28.4</td><td>186亿</td>
+                  <td><button class="text-primary text-xs">加入观察池</button></td>
+                </tr>
+                <tr class="hover:bg-slate-700/20">
+                  <td>600xxx</td><td>标的B</td><td>9.7</td><td>32.1</td><td>242亿</td>
+                  <td><button class="text-primary text-xs">加入观察池</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 回测 -->
+      <div class="page hidden" id="page-backtest">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">策略回测</h1>
+          <p class="text-textmuted mt-1">历史数据模拟，输出净值曲线、胜率、最大回撤</p>
+        </div>
+        <div class="grid grid-cols-12 gap-4">
+          <div class="col-span-4 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">回测参数</h3>
+            <div class="space-y-4 text-sm">
+              <div>
+                <label class="text-textmuted block mb-1">选择策略</label>
+                <select class="w-full bg-darkbg border border-darkborder rounded px-2 py-1">
+                  <option>低估值算力策略</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1">时间区间</label>
+                <div class="flex gap-2">
+                  <input type="date" value="2025-01-01" class="bg-darkbg border border-darkborder rounded w-1/2 px-2 py-1">
+                  <input type="date" value="2026-11-01" class="bg-darkbg border border-darkborder rounded w-1/2 px-2 py-1">
+                </div>
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1">初始资金</label>
+                <input type="number" value="100000" class="w-full bg-darkbg border border-darkborder rounded px-2 py-1">
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1">手续费(%)</label>
+                <input type="number" value="0.05" class="w-full bg-darkbg border border-darkborder rounded px-2 py-1">
+              </div>
+            </div>
+            <button class="w-full mt-6 py-2 rounded-lg bg-primary hover:bg-primary/90 transition text-sm">运行回测</button>
+          </div>
+          <div class="col-span-8 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <h3 class="font-semibold mb-4">回测净值曲线</h3>
+            <div class="h-60">
+              <canvas id="backtestChart"></canvas>
+            </div>
+            <div class="grid grid-cols-4 gap-3 mt-4 text-center text-sm">
+              <div class="bg-darkbg p-3 rounded-lg">
+                <div class="text-textmuted">总收益</div>
+                <div class="text-success font-bold">+42.7%</div>
+              </div>
+              <div class="bg-darkbg p-3 rounded-lg">
+                <div class="text-textmuted">胜率</div>
+                <div class="font-bold">58.2%</div>
+              </div>
+              <div class="bg-darkbg p-3 rounded-lg">
+                <div class="text-textmuted">最大回撤</div>
+                <div class="text-danger font-bold">-18.4%</div>
+              </div>
+              <div class="bg-darkbg p-3 rounded-lg">
+                <div class="text-textmuted">盈亏比</div>
+                <div class="font-bold">1.76</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 热点题材库 -->
+      <div class="page hidden" id="page-hot">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">热点题材库</h1>
+          <p class="text-textmuted mt-1">自动归档每日热点，产业链标签+关联个股</p>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="flex justify-between items-start">
+              <h3 class="font-semibold">算力基础设施</h3>
+              <span class="text-xs px-2 py-0.5 rounded bg-warning/20 text-warning">高热度</span>
+            </div>
+            <div class="text-textmuted text-xs mt-2">产业链：光模块、服务器、IDC、交换机</div>
+            <div class="mt-3 text-sm">关联个股：xxx,xxx,xxx</div>
+          </div>
+          <div class="bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="flex justify-between items-start">
+              <h3 class="font-semibold">半导体设备</h3>
+              <span class="text-xs px-2 py-0.5 rounded bg-primary/20 text-primary">中热度</span>
+            </div>
+            <div class="text-textmuted text-xs mt-2">产业链：刻蚀、沉积、清洗设备</div>
+            <div class="mt-3 text-sm">关联个股：xxx,xxx</div>
+          </div>
+          <div class="bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="flex justify-between items-start">
+              <h3 class="font-semibold">消费复苏</h3>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-600/30 text-textmuted">低热度</span>
+            </div>
+            <div class="text-textmuted text-xs mt-2">产业链：白酒、食品、零售</div>
+            <div class="mt-3 text-sm">关联个股：xxx</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 掘金观察池 -->
+      <div class="page hidden" id="page-watch">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">掘金观察池</h1>
+          <p class="text-textmuted mt-1">自选标的快照，行情、指标快速预览</p>
+        </div>
+        <div class="grid grid-cols-4 gap-4">
+          <div class="bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+            <div class="flex justify-between">
+              <div>
+                <div class="font-semibold">000xxx</div>
+                <div class="text-textmuted text-sm">算力标的A</div>
+              </div>
+              <div class="text-success text-lg">+3.24%</div>
+            </div>
+            <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div>ROE：12.6</div>
+              <div>市值：186亿</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 资讯中心 -->
+      <div class="page hidden" id="page-news">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">资讯中心</h1>
+          <p class="text-textmuted mt-1">AI降噪过滤，只保留影响盘面的资讯</p>
+        </div>
+        <div class="bg-darkcard rounded-xl p-5 card-shadow border border-darkborder space-y-4">
+          <div class="flex gap-3">
+            <span class="px-2 h-6 rounded bg-danger/20 text-danger text-xs">高影响</span>
+            <div>
+              <div class="font-medium">国内算力产业政策落地，支持算力基础设施建设</div>
+              <div class="text-textmuted text-xs mt-1">2026-11-03 07:21</div>
+            </div>
+          </div>
+          <div class="flex gap-3">
+            <span class="px-2 h-6 rounded bg-primary/20 text-primary text-xs">中影响</span>
+            <div>
+              <div class="font-medium">多家半导体设备企业发布三季报，业绩回暖</div>
+              <div class="text-textmuted text-xs mt-1">2026-11-03 09:15</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 任务监控 -->
+      <div class="page hidden" id="page-task">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">任务监控</h1>
+          <p class="text-textmuted mt-1">采集、指标计算、报告生成任务日志与状态</p>
+        </div>
+        <div class="bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
+          <table class="w-full text-sm">
+            <thead class="text-textmuted border-b border-darkborder">
+              <tr>
+                <th class="text-left py-2">任务名称</th>
+                <th class="text-left py-2">执行时间</th>
+                <th class="text-left py-2">状态</th>
+                <th class="text-left py-2">耗时</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-darkborder">
+              <tr class="hover:bg-slate-700/20">
+                <td>全市场行情采集</td>
+                <td>2026-11-03 08:05</td>
+                <td><span class="text-success">成功</span></td>
+                <td>4分42秒</td>
+              </tr>
+              <tr class="hover:bg-slate-700/20">
+                <td>生成盘前早报</td>
+                <td>2026-11-03 08:08</td>
+                <td><span class="text-success">成功</span></td>
+                <td>22秒</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 系统配置 -->
+      <div class="page hidden" id="page-config">
+        <div class="mb-6">
+          <h1 class="text-2xl font-bold">系统配置</h1>
+          <p class="text-textmuted mt-1">数据源、LLM密钥、技术指标存储模式、定时任务开关</p>
+        </div>
+        <div class="grid grid-cols-12 gap-4">
+          <!-- 存储与性能 -->
+          <div class="col-span-12 lg:col-span-7 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder space-y-5">
+            <h3 class="font-semibold border-b border-darkborder pb-3">存储与性能</h3>
+            <!-- 技术指标入库开关 -->
+            <div>
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="font-medium text-sm">技术指标入库</div>
+                  <div class="text-xs text-textmuted mt-0.5">开启→指标写入库表并每日增量；关闭→走本地缓存方案（推荐）</div>
+                </div>
+                <button id="indicatorSwitch" class="relative w-12 h-7 rounded-full transition-colors duration-300 bg-slate-600 focus:outline-none" onclick="toggleIndicator(this)">
+                  <span class="absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white transition-transform duration-300"></span>
+                </button>
+              </div>
+              <div id="indicatorMode" class="mt-2 text-xs px-3 py-2 rounded-lg bg-primary/10 text-primary">当前模式：不入库（本地指标缓存）</div>
+            </div>
+            <!-- 指标缓存有效天数 -->
+            <div>
+              <label class="text-textmuted block mb-1 text-sm">指标缓存有效天数</label>
+              <input type="number" value="1" min="1" class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+              <div class="text-xs text-textmuted mt-1">缓存文件保留天数，到期自动覆盖，不累积占用存储</div>
+            </div>
+            <!-- 指标计算引擎 -->
+            <div>
+              <label class="text-textmuted block mb-1 text-sm">指标计算引擎</label>
+              <select class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+                <option>TA-Lib（C语言，速度快）</option>
+                <option>pandas 内置实现（降级用）</option>
+              </select>
+            </div>
+            <div class="text-xs text-textmuted border-t border-darkborder pt-3">
+              💡 推荐：关闭入库，使用本地缓存方案。基础数据（K线/财务）约 6~7GB，指标不入库可省约 10GB，选股响应毫秒级且不触发数据源风控。
+            </div>
+          </div>
+
+          <!-- 其他配置 -->
+          <div class="col-span-12 lg:col-span-5 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder space-y-5">
+            <h3 class="font-semibold border-b border-darkborder pb-3">数据源与模型</h3>
+            <div>
+              <label class="text-textmuted block mb-1 text-sm">数据源开关（多源互备）</label>
+              <div class="space-y-2 text-sm">
+                <div class="flex items-center justify-between bg-darkbg rounded px-3 py-2">
+                  <span>通达信 mootdx（K线主源）</span>
+                  <span class="text-success text-xs">● 启用</span>
+                </div>
+                <div class="flex items-center justify-between bg-darkbg rounded px-3 py-2">
+                  <span>新浪 easyquotation（快照）</span>
+                  <span class="text-success text-xs">● 启用</span>
+                </div>
+                <div class="flex items-center justify-between bg-darkbg rounded px-3 py-2">
+                  <span>问财 pywencai（选股/研报）</span>
+                  <span class="text-success text-xs">● 启用</span>
+                </div>
+                <div class="flex items-center justify-between bg-darkbg rounded px-3 py-2">
+                  <span>腾讯 / 东方财富（备用）</span>
+                  <span class="text-warning text-xs">◆ 备用</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label class="text-textmuted block mb-1 text-sm">LLM API Key</label>
+              <input type="text" placeholder="大模型密钥" class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+            </div>
+          </div>
+
+          <!-- 定时任务 -->
+          <div class="col-span-12 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder space-y-4">
+            <h3 class="font-semibold border-b border-darkborder pb-3">定时任务</h3>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-textmuted block mb-1 text-sm">盘前早报定时时间</label>
+                <input type="time" value="08:00" class="bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+              </div>
+              <div>
+                <label class="text-textmuted block mb-1 text-sm">盘后复盘定时时间</label>
+                <input type="time" value="17:00" class="bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+              </div>
+            </div>
+            <button class="px-5 py-2 rounded-lg bg-primary hover:bg-primary/90 transition text-sm">保存全部配置</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // 技术指标入库开关
+    function toggleIndicator(btn){
+      const dot = btn.querySelector('span');
+      const mode = document.getElementById('indicatorMode');
+      const isOn = btn.classList.toggle('bg-success');
+      if(isOn){
+        btn.classList.remove('bg-slate-600');
+        dot.style.transform = 'translateX(20px)';
+        mode.textContent = '当前模式：入库（指标写入数据库，每日增量更新）';
+        mode.className = 'mt-2 text-xs px-3 py-2 rounded-lg bg-success/10 text-success';
+      } else {
+        btn.classList.add('bg-slate-600');
+        dot.style.transform = 'translateX(0)';
+        mode.textContent = '当前模式：不入库（本地指标缓存）';
+        mode.className = 'mt-2 text-xs px-3 py-2 rounded-lg bg-primary/10 text-primary';
+      }
+    }
+    // 页面切换
+    const menuItems = document.querySelectorAll('.menu-item');
+    const pages = document.querySelectorAll('.page');
+    menuItems.forEach(item=>{
+      item.onclick = (e)=>{
+        e.preventDefault();
+        const target = item.dataset.page;
+        menuItems.forEach(m=>m.classList.remove('nav-active'));
+        item.classList.add('nav-active');
+        pages.forEach(p=>p.classList.add('hidden'));
+        document.getElementById('page-'+target).classList.remove('hidden');
+      }
+    })
+    // 侧边栏折叠
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('collapseBtn').onclick = ()=>{
+      sidebar.classList.toggle('w-60');
+      sidebar.classList.toggle('w-16');
+    }
+    // Chart 深色主题
+    const chartOpt = {
+      responsive:true,
+      maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#cbd5e1'}}},
+      scales:{
+        x:{ticks:{color:'#94a3b8'},grid:{color:'#273757'}},
+        y:{ticks:{color:'#94a3b8'},grid:{color:'#273757'}}
+      }
+    }
+    new Chart(document.getElementById('sentimentChart'),{
+      type:'line',
+      data:{labels:['10-03','10-04','10-05','10-06','10-07','10-08','10-09'],
+      datasets:[{label:'情绪分',data:[45,52,58,49,61,57,64],borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,0.15)',fill:true,tension:0.3}]},
+      options:chartOpt
+    })
+    new Chart(document.getElementById('replayChart'),{
+      type:'bar',
+      data:{labels:['涨停','连板','跌停'],datasets:[{data:[32,7,4],backgroundColor:['#10b981','#2563eb','#ef4444']}]},
+      options:chartOpt
+    })
+    new Chart(document.getElementById('backtestChart'),{
+      type:'line',
+      data:{labels:['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月'],
+      datasets:[{label:'策略净值',data:[1,1.08,1.14,1.09,1.17,1.25,1.21,1.30,1.36,1.427],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.15)',fill:true,tension:0.3}]},
+      options:chartOpt
+    })
+  </script>
+</body>
+</html>
