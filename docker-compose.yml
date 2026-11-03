@@ -1,0 +1,83 @@
+# daily-stock-ai · Docker Compose（飞牛 fnOS / 宝塔 通用）
+# 使用：复制到部署目录，同目录放 .env（从 .env.example 复制填写），然后 docker compose up -d
+# 注意：所有服务都设置了 TZ=Asia/Shanghai，定时任务依赖它，不要删！
+
+name: daily-stock-ai
+
+services:
+  app:
+    # 路线A（离线导入）：飞牛/宝塔导入 tar 后的镜像名；路线B/C：从 registry 拉取
+    image: ghcr.io/yueyoue/daily-stock-ai:latest
+    container_name: dsa-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"            # 唯一对外端口（后端托管前端静态文件）；宝塔反代时可改为 127.0.0.1:8000:8000
+    environment:
+      TZ: Asia/Shanghai        # 关键：定时报告（08:00/17:00）依赖
+      DATABASE_URL: mysql+pymysql://dsa:${DB_PASSWORD}@mysql:3306/daily_stock_ai?charset=utf8mb4
+      REDIS_URL: redis://redis:6379/0        # 未启用 redis profile 时忽略
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-qwen-plus}
+      REPORT_AM_CRON: ${REPORT_AM_CRON:-0 8 * * 1-5}
+      REPORT_PM_CRON: ${REPORT_PM_CRON:-0 17 * * 1-5}
+    volumes:
+      - ./data:/app/data       # Parquet 指标缓存、导出文件等；飞牛建议整个部署目录放 /vol1/docker/daily-stock-ai/
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "3" }
+
+  mysql:
+    image: mysql:8.0
+    container_name: dsa-mysql
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: daily_stock_ai
+      MYSQL_USER: dsa
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=256M   # NAS 内存小，控制住；大内存可调 512M~1G
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 飞牛想在文件管理里看到数据可改用 bind（备份方便）：
+      # - /vol1/docker/daily-stock-ai/mysql:/var/lib/mysql
+    # ⚠️ 不映射宿主 3306：宝塔自带 MySQL 会占 3306，映射必冲突。
+    #    需要外部工具连库时再临时加：ports: ["3307:3306"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: "50m", max-file: "3" }
+
+  # Redis 为可选（一期建议不用，见审查报告 P1-11）：
+  # 启用：docker compose --profile full up -d
+  redis:
+    image: redis:7-alpine
+    container_name: dsa-redis
+    restart: unless-stopped
+    profiles: ["full"]
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - redis_data:/data
+    logging:
+      driver: json-file
+      options: { max-size: "20m", max-file: "2" }
+
+volumes:
+  mysql_data:
+  redis_data:

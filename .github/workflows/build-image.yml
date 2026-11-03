@@ -1,0 +1,73 @@
+# 放置到仓库：.github/workflows/build-image.yml
+# 触发：打 tag（v*）或手动运行（workflow_dispatch）
+# 产出：① 推送 GHCR 镜像 ② 离线 tar 包 artifact（飞牛/宝塔"导入镜像"用）——即"GitHub 编译、拉到本地"路线
+name: build-image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          # 飞牛为 x86；如需 ARM 设备再加 linux/arm64（构建变慢）
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # ---- 离线交付：docker save 出 tar，上传 artifact ----
+      # 飞牛/宝塔下载该 artifact → Docker"导入镜像"→ compose up（见部署指南路线A）
+      - name: Save image tar for offline import
+        run: |
+          docker pull ghcr.io/${{ github.repository }}:latest
+          docker save ghcr.io/${{ github.repository }}:latest | gzip > daily-stock-ai-image.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daily-stock-ai-image
+          path: daily-stock-ai-image.tar.gz
+          retention-days: 7
+
+      # ---- 可选：推阿里云 ACR 个人版（国内拉取快，路线C）----
+      # 需在仓库 Secrets 配置：ACR_REGISTRY / ACR_USERNAME / ACR_PASSWORD
+      # - name: Login to Aliyun ACR
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ${{ secrets.ACR_REGISTRY }}
+      #     username: ${{ secrets.ACR_USERNAME }}
+      #     password: ${{ secrets.ACR_PASSWORD }}
+      # - name: Push to ACR
+      #   run: |
+      #     docker tag ghcr.io/${{ github.repository }}:latest ${{ secrets.ACR_REGISTRY }}/daily-stock-ai:latest
+      #     docker push ${{ secrets.ACR_REGISTRY }}/daily-stock-ai:latest

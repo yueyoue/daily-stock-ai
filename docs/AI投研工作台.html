@@ -40,6 +40,31 @@
   </style>
 </head>
 <body class="bg-darkbg text-slate-100 font-inter min-h-screen flex overflow-hidden">
+  <!-- 登录（演示原型：任意账号可进入；真实系统由后端会话鉴权 + HTTPS + 登录限速） -->
+  <div id="loginOverlay" class="fixed inset-0 z-50 bg-darkbg/95 flex items-center justify-center">
+    <div class="w-96 bg-darkcard border border-darkborder rounded-xl p-8 card-shadow">
+      <div class="flex items-center mb-6">
+        <div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center mr-3"><i class="fa fa-line-chart text-white"></i></div>
+        <div>
+          <div class="text-lg font-bold">DailyStockAI</div>
+          <div class="text-xs text-textmuted">登录后进入投研工作台</div>
+        </div>
+      </div>
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="text-textmuted block mb-1 text-sm">账号</label>
+          <input type="text" value="admin" class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="text-textmuted block mb-1 text-sm">密码</label>
+          <input type="password" value="demo" class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+        </div>
+        <button type="submit" class="w-full py-2 rounded-lg bg-primary hover:bg-primary/90 transition text-sm">登录</button>
+        <div class="text-xs text-textmuted text-center">演示原型：任意账号可进入</div>
+      </form>
+    </div>
+  </div>
+
   <!-- 侧边栏 -->
   <aside id="sidebar" class="w-60 bg-darkcard border-r border-darkborder flex flex-col transition-all duration-300 flex-shrink-0">
     <div class="h-16 flex items-center px-4 border-b border-darkborder">
@@ -144,9 +169,9 @@
             <div class="text-xs text-textmuted mt-1">连板：7家</div>
           </div>
           <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
-            <div class="text-textmuted text-sm">北向资金</div>
+            <div class="text-textmuted text-sm">主力资金</div>
             <div class="text-3xl font-bold mt-2 text-success">+28.6亿</div>
-            <div class="text-xs text-textmuted mt-1">当日净流入</div>
+            <div class="text-xs text-textmuted mt-1">当日净流入（东财口径；北向净流入已改季度披露，不可实时取）</div>
           </div>
           <div class="col-span-3 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder">
             <div class="text-textmuted text-sm">涨跌家数</div>
@@ -576,8 +601,87 @@
             </div>
             <div>
               <label class="text-textmuted block mb-1 text-sm">LLM API Key</label>
-              <input type="text" placeholder="大模型密钥" class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
+              <input type="password" placeholder="大模型密钥（仅环境变量注入，此处遮蔽显示）" class="w-full bg-darkbg border border-darkborder rounded px-3 py-2 text-sm">
             </div>
+          </div>
+
+          <!-- 数据源接口配置（2.4：可增删改，接口失效可随时更换） -->
+          <div class="col-span-12 bg-darkcard rounded-xl p-5 card-shadow border border-darkborder space-y-4">
+            <div class="flex justify-between items-center border-b border-darkborder pb-3">
+              <h3 class="font-semibold">数据源接口配置（可增删改 · 接口失效可随时更换，无需改代码）</h3>
+              <button onclick="addIfaceRow()" class="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-sm transition whitespace-nowrap"><i class="fa fa-plus mr-1"></i>新增接口</button>
+            </div>
+            <table class="w-full text-sm">
+              <thead class="text-textmuted border-b border-darkborder">
+                <tr>
+                  <th class="text-left py-2 w-28">数据类型</th>
+                  <th class="text-left py-2">接口实现（包/函数/URL，可编辑）</th>
+                  <th class="text-left py-2 w-16">角色</th>
+                  <th class="text-left py-2 w-20">QPS上限</th>
+                  <th class="text-left py-2 w-20">状态</th>
+                  <th class="text-left py-2 w-32">操作</th>
+                </tr>
+              </thead>
+              <tbody id="ifaceTbody" class="divide-y divide-darkborder">
+                <tr>
+                  <td class="py-2">日线K线</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">mootdx · 通达信日线</td>
+                  <td class="py-2"><span class="text-primary">主源</span></td>
+                  <td class="py-2" contenteditable="true">2</td>
+                  <td class="py-2"><span class="text-success">✓ 正常</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+                <tr>
+                  <td class="py-2">日线K线</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">akshare · 腾讯K线（备用）</td>
+                  <td class="py-2"><span class="text-warning">备用</span></td>
+                  <td class="py-2" contenteditable="true">1</td>
+                  <td class="py-2"><span class="text-success">✓ 正常</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+                <tr>
+                  <td class="py-2">全市场快照</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">easyquotation · 新浪快照</td>
+                  <td class="py-2"><span class="text-primary">主源</span></td>
+                  <td class="py-2" contenteditable="true">1</td>
+                  <td class="py-2"><span class="text-success">✓ 正常</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+                <tr>
+                  <td class="py-2">条件选股/研报</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">pywencai · 问财（需Node.js+Cookie维护）</td>
+                  <td class="py-2"><span class="text-primary">主源</span></td>
+                  <td class="py-2" contenteditable="true">0.5</td>
+                  <td class="py-2"><span class="text-warning">◆ Cookie 待维护</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+                <tr>
+                  <td class="py-2">研报</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">akshare · 东财研报（备用）</td>
+                  <td class="py-2"><span class="text-warning">备用</span></td>
+                  <td class="py-2" contenteditable="true">0.5</td>
+                  <td class="py-2"><span class="text-success">✓ 正常</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+                <tr>
+                  <td class="py-2">财经资讯</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">akshare · 财联社电报</td>
+                  <td class="py-2"><span class="text-primary">主源</span></td>
+                  <td class="py-2" contenteditable="true">0.5</td>
+                  <td class="py-2"><span class="text-success">✓ 正常</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+                <tr>
+                  <td class="py-2">财务数据</td>
+                  <td class="py-2 text-slate-300" contenteditable="true">akshare · 东财财务</td>
+                  <td class="py-2"><span class="text-primary">主源</span></td>
+                  <td class="py-2" contenteditable="true">1</td>
+                  <td class="py-2"><span class="text-success">✓ 正常</span></td>
+                  <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="text-xs text-textmuted">💡 单元格可直接编辑；“新增接口”登记新线路（包函数名或 HTTP 接口地址 + 参数模板）。采集器按“数据类型 → 启用中优先级最高”自动选路，主源失败自动降级，过程记录到 data_source_log / data_reconcile。</div>
           </div>
 
           <!-- 定时任务 -->
@@ -664,6 +768,26 @@
       datasets:[{label:'策略净值',data:[1,1.08,1.14,1.09,1.17,1.25,1.21,1.30,1.36,1.427],borderColor:'#10b981',backgroundColor:'rgba(16,185,129,0.15)',fill:true,tension:0.3}]},
       options:chartOpt
     })
+    // 登录演示（真实系统：后端会话鉴权 + HTTPS + 连续失败5次锁定10分钟）
+    document.getElementById('loginForm').onsubmit = (e)=>{
+      e.preventDefault();
+      document.getElementById('loginOverlay').style.display='none';
+    };
+    // 数据源接口配置演示：新增/删除/连通性测试
+    function addIfaceRow(){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="py-2" contenteditable="true">新数据类型</td>
+        <td class="py-2 text-slate-300" contenteditable="true">接口名或URL（点击编辑）</td>
+        <td class="py-2"><span class="text-warning">备用</span></td>
+        <td class="py-2" contenteditable="true">1</td>
+        <td class="py-2"><span class="text-textmuted">未测试</span></td>
+        <td class="py-2 space-x-2 whitespace-nowrap"><button onclick="testIface(this)" class="text-primary text-xs">测试</button><button onclick="this.closest('tr').remove()" class="text-danger text-xs">删除</button></td>`;
+      document.getElementById('ifaceTbody').appendChild(tr);
+    }
+    function testIface(btn){
+      const cell = btn.closest('tr').children[4];
+      cell.innerHTML = '<span class="text-success">✓ 正常</span>';
+    }
   </script>
 </body>
 </html>
