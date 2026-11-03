@@ -273,8 +273,9 @@ def test_seed_data_sources_idempotent():
         rows = db.query(DataSourceConfig).filter(
             DataSourceConfig.data_type == "stock_info"
         ).order_by(DataSourceConfig.priority.asc()).all()
+        stock_sources = [s for s in INITIAL_SOURCES if s["data_type"] == "stock_info"]
         assert [r.name for r in rows] == [
-            s["name"] for s in sorted(INITIAL_SOURCES, key=lambda s: s["priority"])
+            s["name"] for s in sorted(stock_sources, key=lambda s: s["priority"])
         ]
         assert rows[0].impl_ref == "app.collectors.stock_info:AkshareStockInfoCollector"
     finally:
