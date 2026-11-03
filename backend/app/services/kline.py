@@ -151,7 +151,7 @@ def sync_kline_for_code(
     """
     plan = plan_ranges(db, code, end_date=end_date, force_full=force_full)
     stats = {"code": code, "mode": plan["mode"], "ranges": len(plan["ranges"]),
-             "received": 0, "inserted": 0, "updated": 0}
+             "received": 0, "inserted": 0, "updated": 0, "dropped": 0}
     if not plan["ranges"]:
         logger.info("[%s] K线已最新，无需采集", code)
         return stats

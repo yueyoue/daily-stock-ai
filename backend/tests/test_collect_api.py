@@ -1,6 +1,8 @@
 """T1.10 验收：POST /api/collect/trigger（鉴权/任务 id/异步执行/task_log 记录）。"""
 from datetime import date
 
+from app.core.auth import hash_password
+from app.models.admin_user import AdminUser
 from app.models.base import SessionLocal, init_db
 from app.models.market import StockInfo, StockKline
 from app.models.system import DataSourceConfig, TaskLog
@@ -14,6 +16,15 @@ ADMIN_PASS = "test-pass-123"
 
 def setup_function():
     init_db()
+    # 共享测试库：test_auth 的改密用例会永久改掉 admin 密码，这里重置回初始值
+    db = SessionLocal()
+    try:
+        user = db.query(AdminUser).filter_by(username=ADMIN_USER).first()
+        if user is not None:
+            user.password_hash = hash_password(ADMIN_PASS)
+        db.commit()
+    finally:
+        db.close()
 
 
 def _clean(db):
