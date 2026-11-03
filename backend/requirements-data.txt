@@ -1,0 +1,11 @@
+# 数据采集 / 指标 / LLM 重依赖（Docker 镜像内安装；CI 测试不装，隔离 TA-Lib C 依赖）
+# TA-Lib 需要底层 C 库：Dockerfile 内已编译安装 ta-lib-0.4.0
+pandas>=2.2
+numpy>=1.26
+requests>=2.31
+akshare>=1.14
+mootdx>=0.7
+easyquotation>=0.6
+pywencai==0.12.2
+TA-Lib>=0.4.32
+litellm>=1.52
