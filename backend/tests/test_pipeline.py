@@ -37,9 +37,10 @@ def _register_fakes(db, kline_codes=("600000",)):
                   impl_ref="tests.fake_sources:FakeKlineCollector", priority=1)
     create_source(db, data_type="finance", name="假财务源",
                   impl_ref="tests.fake_sources:FakeFinanceCollector", priority=1)
-    for kind, name in [("moneyflow", "假资金线"), ("limit", "假涨跌停线"),
-                       ("market", "假家数线")]:
-        create_source(db, data_type=kind, name=name,
+    for data_type, kind, name in [("moneyflow", "moneyflow", "假资金线"),
+                                  ("limit_updown", "limit", "假涨跌停线"),
+                                  ("market_summary", "market", "假家数线")]:
+        create_source(db, data_type=data_type, name=name,
                       impl_ref="tests.fake_sources:FakeMarketDataCollector",
                       params_template={"kind": kind}, priority=1)
     for code in kline_codes:
