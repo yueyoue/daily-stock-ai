@@ -12,6 +12,7 @@ from app.core.auth import install_auth_middleware, seed_admin
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
 from app.core.logging import setup_logging
+from app.services.source_seed import seed_data_sources
 
 setup_logging()
 settings = get_settings()
@@ -25,6 +26,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_admin(db)
+        seed_data_sources(db)
     finally:
         db.close()
     yield

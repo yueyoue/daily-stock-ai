@@ -1,0 +1,62 @@
+"""数据源接口初始登记（开发文档 §2.4.3 接口注册清单）。
+
+- 应用启动时幂等补种 data_source_config（已存在的 (数据类型, 名称) 不覆盖，
+  设置页的用户修改永远优先）
+- 采集器实现按"模块:类"登记，业务代码不 import 具体数据源（§2.4 硬约束 4）
+- 后续任务接入新数据类型时，在 INITIAL_SOURCES 追加一行即可
+"""
+import logging
+
+from sqlalchemy.orm import Session
+
+from app.models.system import DataSourceConfig
+from app.services.source_registry import create_source
+
+logger = logging.getLogger("app.source_seed")
+
+# §2.4.3 初始登记（启用中；QPS 按清单建议值）
+INITIAL_SOURCES: list[dict] = [
+    {
+        "data_type": "stock_info",
+        "name": "akshare-东财行业概念",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.stock_info:AkshareStockInfoCollector",
+        "params_template": {"include_industry": True, "include_concepts": True},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 0.5,
+        "timeout_sec": 600,
+    },
+    {
+        "data_type": "stock_info",
+        "name": "akshare-东财列表(轻量)",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.stock_info:AkshareStockInfoCollector",
+        "params_template": {"include_industry": True, "include_concepts": False},
+        "role": "备用",
+        "priority": 2,
+        "qps_limit": 1.0,
+        "timeout_sec": 300,
+    },
+]
+
+
+def seed_data_sources(db: Session) -> int:
+    """补种初始接口配置，返回本次新增条数（幂等）。"""
+    inserted = 0
+    for spec in INITIAL_SOURCES:
+        exists = (
+            db.query(DataSourceConfig)
+            .filter(
+                DataSourceConfig.data_type == spec["data_type"],
+                DataSourceConfig.name == spec["name"],
+            )
+            .first()
+        )
+        if exists is not None:
+            continue
+        create_source(db, **spec)
+        inserted += 1
+    if inserted:
+        logger.info("数据源初始登记补种 %d 条", inserted)
+    return inserted

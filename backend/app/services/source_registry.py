@@ -82,12 +82,17 @@ def write_log(
 
 
 def call_source(db: Session, source: DataSourceConfig, **params) -> list[dict]:
-    """调用单接口：QPS 限流 → 采集 → 记日志/更新健康状态。失败抛 DataSourceError。"""
+    """调用单接口：QPS 限流 → 采集 → 记日志/更新健康状态。失败抛 DataSourceError。
+
+    params_template 作为默认参数合并（调用方参数优先）——接口行为差异
+    （如 stock_info 主源带概念/备源轻量）由配置控制，不写死在调用方。
+    """
     _rate_limiter.wait(f"src:{source.id}", source.qps_limit)
     t0 = time.monotonic()
+    merged = {**(source.params_template or {}), **params}
     try:
         collector = build_collector(source)
-        records = collector.fetch(**params) or []
+        records = collector.fetch(**merged) or []
         duration_ms = int((time.monotonic() - t0) * 1000)
         source.last_ok_at = datetime.now()
         source.last_error = ""
