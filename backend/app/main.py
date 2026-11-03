@@ -12,8 +12,12 @@ from app.api.collect import router as collect_router
 from app.api.dashboard import router as dashboard_router
 from app.api.deps import require_user
 from app.api.health import router as health_router
+from app.api.hot import router as hot_router
+from app.api.news import router as news_router
 from app.api.report import router as report_router
 from app.api.selector import router as selector_router
+from app.api.task import router as task_router
+from app.api.watchlist import router as watchlist_router
 from app.core.auth import install_auth_middleware, seed_admin
 from app.core.config import get_settings
 from app.core.errors import install_error_handlers
@@ -72,6 +76,10 @@ app.include_router(dashboard_router, dependencies=[Depends(require_user)])
 app.include_router(report_router, dependencies=[Depends(require_user)])
 app.include_router(selector_router, dependencies=[Depends(require_user)])
 app.include_router(backtest_router, dependencies=[Depends(require_user)])
+app.include_router(hot_router, dependencies=[Depends(require_user)])
+app.include_router(news_router, dependencies=[Depends(require_user)])
+app.include_router(watchlist_router, dependencies=[Depends(require_user)])
+app.include_router(task_router, dependencies=[Depends(require_user)])
 
 
 @app.get("/docs", include_in_schema=False)

@@ -445,7 +445,8 @@
 | POST | /api/selector/scan | 执行选股扫描 |
 | POST | /api/backtest/run | 提交回测任务 |
 | GET | /api/backtest/{id} | 获取回测结果 |
-| GET | /api/hot_topic/list | 热点列表 |
+| GET | /api/hot_topic/list | 热点列表（板块/关键词/日期检索） |
+| GET | /api/news/list | 资讯列表（板块/关键词/日期/影响等级/来源过滤） |
 | GET | /api/watchlist/list | 观察池列表 |
 | POST | /api/watchlist/add | 加入观察池 |
 | DELETE | /api/watchlist/{id} | 移出观察池 |
