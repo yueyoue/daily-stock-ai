@@ -21,7 +21,19 @@ jobs:
         run: pip install -r backend/requirements.txt -r backend/requirements-dev.txt
       - name: Run tests
         working-directory: backend
-        run: python -m pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest -q --tb=short 2>&1 | tee pytest.out
+          rc=$?
+          if [ $rc -ne 0 ]; then
+            {
+              echo "## ❌ pytest 失败输出"
+              echo '```'
+              tail -80 pytest.out
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit $rc
 
   frontend-build:
     runs-on: ubuntu-latest
