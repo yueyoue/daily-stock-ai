@@ -123,3 +123,20 @@ class FakeKlineCollector:
             params.get("start_date", ""), params.get("end_date", ""),
             code=params.get("code"),
         )
+
+
+class FakeBackupKlineCollector(FakeKlineCollector):
+    """演练用备用 K 线源（T1.11）：独立状态 + 不同价格基准，便于核对取数来源。"""
+
+    calls: list = []
+    fail = False
+    base_price = 20.0
+
+    def fetch(self, **params):
+        FakeBackupKlineCollector.calls.append(dict(params))
+        if FakeBackupKlineCollector.fail:
+            raise RuntimeError("模拟备源失效")
+        return FakeBackupKlineCollector.rows_in_range(
+            params.get("start_date", ""), params.get("end_date", ""),
+            code=params.get("code"),
+        )
