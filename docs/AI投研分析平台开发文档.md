@@ -169,7 +169,7 @@
 | 数据类型 | 初始主源 | 初始备用 | QPS 建议 |
 |---|---|---|---|
 | 个股基础信息 | akshare-东财行业概念 | akshare-东财列表(轻量，无概念) | 0.5 |
-| 日线 K 线 | mootdx（通达信） | akshare-腾讯、akshare-东财 | 主 2 / 备 1 |
+| 日线 K 线 | mootdx（通达信） | akshare-新浪(含复权因子)、akshare-东财 | 主 2 / 备 1 |
 | 全市场快照 | easyquotation（新浪） | akshare-东财 | 1 |
 | 财务数据 | akshare-东财 | akshare-新浪 | 1 |
 | 资金流向 | akshare-东财 | akshare-同花顺 | 1 |
