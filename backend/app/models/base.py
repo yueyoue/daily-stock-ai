@@ -32,6 +32,6 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    from app.models import admin_user  # noqa: F401  确保模型注册后再建表
+    import app.models  # noqa: F401  确保全部模型注册后再建表
 
     Base.metadata.create_all(engine)
