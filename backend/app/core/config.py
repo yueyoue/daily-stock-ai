@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     indicator_cache_dir: str = "data/indicator_cache"
     indicator_cache_keep_days: int = 3
 
+    # 技术指标入库开关（开发文档 §5.4：模式 A 写库每日增量；默认关=模式 B 缓存）
+    tech_indicator_store: bool = False
+
     # 前端产物目录（单镜像由后端托管，开发文档 §8.1）
     frontend_dist: str = "frontend/dist"
 
