@@ -17,6 +17,34 @@ class FakeEchoCollector:
         return [{"params": params}]
 
 
+class FakeFinanceCollector:
+    """可配置假财务采集器（T1.8）。"""
+
+    calls: list = []
+    fail = False
+
+    @classmethod
+    def reset(cls):
+        cls.calls = []
+        cls.fail = False
+
+    def fetch(self, **params):
+        FakeFinanceCollector.calls.append(dict(params))
+        if FakeFinanceCollector.fail:
+            raise RuntimeError("模拟接口失效")
+        code = params.get("code", "600000")
+        return [
+            {"code": code, "report_date": date(2025, 12, 31), "report_type": "quarterly",
+             "total_revenue": 100.0, "net_profit": 10.0, "operating_cashflow": 30.0,
+             "total_assets": 1000.0, "total_liabilities": 500.0, "equity": 500.0,
+             "eps": 1.0, "extra": {"ROE_RAW": 20.0}},
+            {"code": code, "report_date": date(2025, 9, 30), "report_type": "quarterly",
+             "total_revenue": 80.0, "net_profit": 8.0, "operating_cashflow": 20.0,
+             "total_assets": 900.0, "total_liabilities": 450.0, "equity": 450.0,
+             "eps": 0.8, "extra": {"ROE_RAW": 18.0}},
+        ]
+
+
 class FakeKlineCollector:
     """可配置假 K 线采集器（T1.7）：类级状态记录调用参数/控制产出与失败。"""
 

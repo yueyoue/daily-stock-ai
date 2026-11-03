@@ -72,6 +72,29 @@ INITIAL_SOURCES: list[dict] = [
         "qps_limit": 1.0,
         "timeout_sec": 60,
     },
+    # ---- 财务数据（§2.4.3：akshare-东财主 / 新浪备，QPS 1）----
+    {
+        "data_type": "finance",
+        "name": "akshare-东财三大报表",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.finance:AkshareEastsFinanceCollector",
+        "params_template": {},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 1.0,
+        "timeout_sec": 60,
+    },
+    {
+        "data_type": "finance",
+        "name": "akshare-新浪三大报表",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.finance:AkshareSinaFinanceCollector",
+        "params_template": {},
+        "role": "备用",
+        "priority": 2,
+        "qps_limit": 1.0,
+        "timeout_sec": 60,
+    },
 ]
 
 
