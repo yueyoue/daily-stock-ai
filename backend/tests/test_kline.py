@@ -118,9 +118,18 @@ def test_upsert_insert_update_idempotent():
         assert upsert_kline(db, [rec, dict(rec)])["inserted"] == 1  # 同批次去重
         rec2 = dict(rec, close=10.6, adj_factor=1.02)
         s = upsert_kline(db, [rec2])  # 幂等更新
-        assert s == {"received": 1, "inserted": 0, "updated": 1}
+        assert s == {"received": 1, "inserted": 0, "updated": 1, "dropped": 0}
         row = db.get(StockKline, ("600000", date(2020, 1, 2)))
         assert row.close == 10.6 and row.adj_factor == 1.02
+
+        # 异常值过滤：高低价倒挂/价格非正丢弃并计数
+        bad = upsert_kline(db, [
+            {"code": "600000", "date": date(2020, 1, 3), "open": 10, "high": 9,
+             "low": 11, "close": 10},
+            {"code": "600000", "date": date(2020, 1, 4), "open": -1, "high": 1,
+             "low": 1, "close": 1},
+        ])
+        assert bad["dropped"] == 2 and bad["inserted"] == 0
     finally:
         db.close()
 

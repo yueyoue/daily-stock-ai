@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.api.auth import router as auth_router
+from app.api.collect import router as collect_router
 from app.api.health import router as health_router
 from app.core.auth import install_auth_middleware, seed_admin
 from app.core.config import get_settings
@@ -54,6 +55,7 @@ app.add_middleware(
 # ---- API 路由 ----
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(collect_router)
 
 # ---- 前端静态托管（镜像内 frontend/dist 存在时，开发文档 §8.1 单镜像交付）----
 _DIST = Path(settings.frontend_dist)

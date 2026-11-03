@@ -22,8 +22,11 @@ LOOKBACK_YEARS = 20  # §5.2：20 年上限（不足按实际上市日）
 
 
 def upsert_kline(db: Session, records: list[dict]) -> dict:
-    """入库标准化 K 线记录（同 (code,date) 先到先得；重复执行幂等）。"""
-    inserted = updated = 0
+    """入库标准化 K 线记录（同 (code,date) 先到先得；重复执行幂等）。
+
+    清洗：价格非正/高低价倒挂的记录丢弃并计数（异常值过滤）。
+    """
+    inserted = updated = dropped = 0
     seen: set[tuple[str, date]] = set()
     for rec in records:
         code = str(rec.get("code", "")).strip()
@@ -33,12 +36,20 @@ def upsert_kline(db: Session, records: list[dict]) -> dict:
         if not code or d is None or (code, d) in seen:
             continue
         seen.add((code, d))
-        fields = dict(
-            open=float(rec["open"]), high=float(rec["high"]), low=float(rec["low"]),
-            close=float(rec["close"]),
-            volume=float(rec.get("volume") or 0), amount=float(rec.get("amount") or 0),
-            adj_factor=float(rec.get("adj_factor") or 1.0),
-        )
+        try:
+            fields = dict(
+                open=float(rec["open"]), high=float(rec["high"]), low=float(rec["low"]),
+                close=float(rec["close"]),
+                volume=float(rec.get("volume") or 0), amount=float(rec.get("amount") or 0),
+                adj_factor=float(rec.get("adj_factor") or 1.0),
+            )
+        except (KeyError, TypeError, ValueError):
+            dropped += 1
+            continue
+        if not (fields["open"] > 0 and fields["high"] > 0 and fields["low"] > 0
+                and fields["close"] > 0 and fields["high"] >= fields["low"]):
+            dropped += 1  # 异常值过滤：价格非正/高低价倒挂
+            continue
         row = db.get(StockKline, (code, d))
         if row is None:
             db.add(StockKline(code=code, date=d, **fields))
@@ -48,7 +59,8 @@ def upsert_kline(db: Session, records: list[dict]) -> dict:
                 setattr(row, k, v)
             updated += 1
     db.commit()
-    return {"received": len(seen), "inserted": inserted, "updated": updated}
+    return {"received": len(seen), "inserted": inserted, "updated": updated,
+            "dropped": dropped}
 
 
 def plan_ranges(
@@ -150,7 +162,7 @@ def sync_kline_for_code(
             code=code, start_date=r["start"].isoformat(), end_date=r["end"].isoformat(),
         )
         s = upsert_kline(db, records)
-        for k in ("received", "inserted", "updated"):
+        for k in ("received", "inserted", "updated", "dropped"):
             stats[k] += s[k]
         done = i == len(plan["ranges"]) - 1
         min_d, max_d = (

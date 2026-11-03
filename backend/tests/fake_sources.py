@@ -17,6 +17,16 @@ class FakeEchoCollector:
         return [{"params": params}]
 
 
+class FakeStockInfoCollector:
+    """假股票基础信息采集器（T1.10 流水线用）。"""
+
+    def fetch(self, **params):
+        return [
+            {"code": "600000", "name": "股600000", "industry": "行业A",
+             "concepts": ["概念A"], "market": "主板"},
+        ]
+
+
 class FakeMarketDataCollector:
     """假大盘汇总采集器（T1.9）：params_template 传 kind 区分三条线。"""
 
@@ -89,7 +99,7 @@ class FakeKlineCollector:
             setattr(cls, k, v)
 
     @classmethod
-    def rows_in_range(cls, start_date: str, end_date: str) -> list:
+    def rows_in_range(cls, start_date: str, end_date: str, code: str | None = None) -> list:
         out = []
         for i in range(cls.days):
             d = cls.start + timedelta(days=i)
@@ -98,7 +108,7 @@ class FakeKlineCollector:
             if end_date and d.isoformat() > end_date:
                 continue
             out.append({
-                "code": cls.code, "date": d,
+                "code": code or cls.code, "date": d,
                 "open": cls.base_price, "high": cls.base_price + 1,
                 "low": cls.base_price - 1, "close": cls.base_price + i * 0.1,
                 "volume": 1000.0, "amount": 10000.0, "adj_factor": 1.0 + i * 0.01,
@@ -110,5 +120,6 @@ class FakeKlineCollector:
         if FakeKlineCollector.fail:
             raise RuntimeError("模拟断网/接口失效")
         return FakeKlineCollector.rows_in_range(
-            params.get("start_date", ""), params.get("end_date", "")
+            params.get("start_date", ""), params.get("end_date", ""),
+            code=params.get("code"),
         )
