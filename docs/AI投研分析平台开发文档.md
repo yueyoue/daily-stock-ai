@@ -429,6 +429,7 @@
 |---|---|---|
 | GET | /api/health | 健康检查（Docker 健康检查、反代探活） |
 | POST | /api/auth/login | 登录（限速：5 次失败锁 10 分钟） |
+| GET | /api/auth/session | 当前登录会话（路由守卫用） |
 | POST | /api/auth/logout | 退出登录 |
 | POST | /api/auth/password | 修改密码 |
 | GET | /api/dashboard/market | 大盘首页数据 |
