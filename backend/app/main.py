@@ -2,12 +2,13 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from app.api.auth import router as auth_router
 from app.api.collect import router as collect_router
+from app.api.deps import require_user
 from app.api.health import router as health_router
 from app.core.auth import install_auth_middleware, seed_admin
 from app.core.config import get_settings
@@ -36,6 +37,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
+    description=(
+        "DailyStockAI API（开发文档 §7 契约）。约定："
+        "① 鉴权覆盖全部 /api/*（白名单仅 health/login/docs）；"
+        "② 统一错误格式 {\"code\": int, \"message\": str}，错误码表见 core/errors.ERROR_CODES；"
+        "③ 列表接口统一分页参数 page/page_size，响应 {items,total,page,page_size}。"
+    ),
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
     lifespan=lifespan,
@@ -55,7 +62,14 @@ app.add_middleware(
 # ---- API 路由 ----
 app.include_router(health_router)
 app.include_router(auth_router)
-app.include_router(collect_router)
+# 业务路由统一挂鉴权依赖（T3.1）：新增路由照此挂载，白名单接口单独处理
+app.include_router(collect_router, dependencies=[Depends(require_user)])
+
+
+@app.get("/docs", include_in_schema=False)
+async def docs_alias():
+    """开发文档约定 /docs 可浏览（重定向到 /api/docs）。"""
+    return RedirectResponse("/api/docs")
 
 # ---- 前端静态托管（镜像内 frontend/dist 存在时，开发文档 §8.1 单镜像交付）----
 _DIST = Path(settings.frontend_dist)
