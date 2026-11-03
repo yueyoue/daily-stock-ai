@@ -68,6 +68,26 @@ class TradeCalendar(Base):
     is_trading_day: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
+class CollectProgress(Base):
+    """断点续采记录（T1.7）：按 (code, data_type) 记录已采范围。"""
+
+    __tablename__ = "collect_progress"
+    __table_args__ = (
+        UniqueConstraint("code", "data_type", name="uq_progress_code_type"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    code: Mapped[str] = mapped_column(String(12), index=True)
+    data_type: Mapped[str] = mapped_column(String(32), default="kline")
+    first_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    last_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="partial")  # partial / complete
+    note: Mapped[str] = mapped_column(String(256), default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
 class TaskLog(Base):
     """后台任务日志（§6）。"""
 

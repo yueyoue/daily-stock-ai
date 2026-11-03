@@ -38,6 +38,40 @@ INITIAL_SOURCES: list[dict] = [
         "qps_limit": 1.0,
         "timeout_sec": 300,
     },
+    # ---- 日线 K 线（§2.4.3：主 2 / 备 1；mootdx 主源 + akshare 双备源）----
+    {
+        "data_type": "kline",
+        "name": "mootdx-通达信日线",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.kline:MootdxKlineCollector",
+        "params_template": {},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 2.0,
+        "timeout_sec": 60,
+    },
+    {
+        "data_type": "kline",
+        "name": "akshare-新浪日线(含复权因子)",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.kline:AkshareSinaKlineCollector",
+        "params_template": {},
+        "role": "备用",
+        "priority": 2,
+        "qps_limit": 1.0,
+        "timeout_sec": 60,
+    },
+    {
+        "data_type": "kline",
+        "name": "akshare-东财日线(hfq推导因子)",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.kline:AkshareEastsKlineCollector",
+        "params_template": {},
+        "role": "备用",
+        "priority": 3,
+        "qps_limit": 1.0,
+        "timeout_sec": 60,
+    },
 ]
 
 

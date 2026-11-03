@@ -15,7 +15,7 @@ EXPECTED_TABLES = {
     "market_daily", "report", "stock_strategy", "backtest_record",
     "hot_topic", "news", "watch_list",
     "data_source_log", "data_reconcile", "data_source_config",
-    "trade_calendar", "admin_user", "task_log",
+    "trade_calendar", "admin_user", "task_log", "collect_progress",
 }
 
 
