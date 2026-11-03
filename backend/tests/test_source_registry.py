@@ -11,7 +11,7 @@ from app.services.source_registry import (
     create_source,
     delete_source,
     pick_sources,
-    test_connection,
+    probe_source,
     update_source,
 )
 from app.utils.ratelimit import RateLimiter
@@ -117,13 +117,13 @@ def test_test_connection_reports_result():
     try:
         _seed(db)
         ok = pick_sources(db, "kline")[0]
-        result = test_connection(db, ok.id)
+        result = probe_source(db, ok.id)
         assert result["ok"] is True and result["count"] == 1
 
         bad = create_source(
             db, data_type="news", name="坏源2", impl_ref="tests.fake_sources:FakeFailCollector",
         )
-        result2 = test_connection(db, bad.id)
+        result2 = probe_source(db, bad.id)
         assert result2["ok"] is False and "模拟接口失效" in result2["error"]
     finally:
         db.close()

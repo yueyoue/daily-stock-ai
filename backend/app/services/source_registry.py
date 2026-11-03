@@ -136,8 +136,11 @@ def delete_source(db: Session, source_id: int) -> None:
     db.commit()
 
 
-def test_connection(db: Session, source_id: int) -> dict:
-    """连通性测试：试采 1 次（用接口自带参数模板），返回结果供设置页展示。"""
+def probe_source(db: Session, source_id: int) -> dict:
+    """连通性测试：试采 1 次（用接口自带参数模板），返回结果供设置页展示。
+
+    ⚠️ 命名注意：服务函数禁止用 test_ 前缀（pytest 会误收集），故名 probe_source。
+    """
     src = db.get(DataSourceConfig, source_id)
     if src is None:
         raise AppError(404, "接口配置不存在")
