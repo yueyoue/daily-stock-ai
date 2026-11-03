@@ -8,12 +8,16 @@ services:
   app:
     # 路线A（离线导入）：飞牛/宝塔导入 tar 后的镜像名；路线B/C：从 registry 拉取
     image: ghcr.io/yueyoue/daily-stock-ai:latest
+    build: .                     # 本地开发可 docker compose up --build（CI 产物优先用 image）
     container_name: dsa-app
     restart: unless-stopped
     ports:
       - "8000:8000"            # 唯一对外端口（后端托管前端静态文件）；宝塔反代时可改为 127.0.0.1:8000:8000
     environment:
       TZ: Asia/Shanghai        # 关键：定时报告（08:00/17:00）依赖
+      SECRET_KEY: ${SECRET_KEY:-dev-c…ge}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}   # 留空则启动日志打印随机初始密码
       DATABASE_URL: mysql+pymysql://dsa:${DB_PASSWORD}@mysql:3306/daily_stock_ai?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0        # 未启用 redis profile 时忽略
       LLM_API_KEY: ${LLM_API_KEY}
