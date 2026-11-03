@@ -1,9 +1,60 @@
-// T0.1 空骨架占位；T0.3 起替换为路由 + 页面 + API client
+import { ConfigProvider, theme } from 'antd'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import AppLayout from './components/AppLayout'
+import RequireAuth from './components/RequireAuth'
+import LoginPage from './pages/LoginPage'
+import {
+  AfternoonPage,
+  BacktestPage,
+  ConfigPage,
+  DashboardPage,
+  HotPage,
+  MorningPage,
+  NewsPage,
+  SelectorPage,
+  TaskPage,
+  WatchPage,
+} from './pages/placeholders'
+
+// 深色主题对齐原型（docs/AI投研工作台.html：#0b1120/#162138/#273757/#2563eb）
 export default function App() {
   return (
-    <div style={{ padding: 40, fontFamily: 'system-ui' }}>
-      <h1>DailyStockAI</h1>
-      <p>工程骨架运行中（T0.1）。</p>
-    </div>
+    <ConfigProvider
+      theme={{
+        algorithm: theme.darkAlgorithm,
+        token: {
+          colorPrimary: '#2563eb',
+          colorBgBase: '#0b1120',
+          colorBgContainer: '#162138',
+          colorBorderSecondary: '#273757',
+          borderRadius: 8,
+        },
+      }}
+    >
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route
+            element={
+              <RequireAuth>
+                <AppLayout />
+              </RequireAuth>
+            }
+          >
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/morning" element={<MorningPage />} />
+            <Route path="/afternoon" element={<AfternoonPage />} />
+            <Route path="/selector" element={<SelectorPage />} />
+            <Route path="/backtest" element={<BacktestPage />} />
+            <Route path="/hot" element={<HotPage />} />
+            <Route path="/watch" element={<WatchPage />} />
+            <Route path="/news" element={<NewsPage />} />
+            <Route path="/task" element={<TaskPage />} />
+            <Route path="/config" element={<ConfigPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </ConfigProvider>
   )
 }
