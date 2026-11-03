@@ -19,9 +19,9 @@ logger = logging.getLogger("app.source_registry")
 
 _rate_limiter = RateLimiter()
 
-# 可编辑字段白名单（设置页增删改用）
+# 可编辑字段白名单（设置页增删改用）；data_type 创建后也可改（调用方自行保证一致性）
 _EDITABLE_FIELDS = {
-    "name", "impl_kind", "impl_ref", "params_template", "role",
+    "data_type", "name", "impl_kind", "impl_ref", "params_template", "role",
     "priority", "qps_limit", "timeout_sec", "enabled",
 }
 
