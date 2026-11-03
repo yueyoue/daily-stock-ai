@@ -1,2 +1,6 @@
 # 开发/测试依赖
 pytest>=8.0
+# T2.2 双引擎：pandas 降级引擎 + TA-Lib 主引擎对账（CI 直接装轮子验证两引擎一致）
+pandas>=2.2
+numpy>=1.26
+TA-Lib>=0.4.32

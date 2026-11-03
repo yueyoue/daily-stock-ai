@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     report_am_cron: str = "0 8 * * 1-5"
     report_pm_cron: str = "0 17 * * 1-5"
 
+    # 指标计算（开发文档 §5.4：TA-Lib 主引擎 / pandas 降级）
+    indicator_engine: str = "talib"  # talib | pandas
+
     # 前端产物目录（单镜像由后端托管，开发文档 §8.1）
     frontend_dist: str = "frontend/dist"
 
