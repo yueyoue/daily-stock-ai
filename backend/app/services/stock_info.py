@@ -35,8 +35,8 @@ def upsert_stock_info(
     seen: set[str] = set()
     for rec in records:
         code = str(rec.get("code", "")).strip()
-        if not code:
-            continue
+        if not code or code in seen:
+            continue  # 同批次去重：先到先得（与 normalize 口径一致）
         seen.add(code)
         name = str(rec.get("name", "")).strip()
         industry = str(rec.get("industry", "")).strip()
@@ -97,12 +97,9 @@ def upsert_stock_info(
         .scalar()
         or 0
     )
-    concept_filled = (
-        db.query(func.count(StockInfo.code))
-        .filter(func.json_length(StockInfo.concepts) > 0)
-        .scalar()
-        or 0
-    )
+    concept_filled = sum(
+        1 for (c,) in db.query(StockInfo.concepts).all() if c
+    )  # Python 侧计数：SQLite 无 json_length 函数，避免方言依赖
     return {
         "received": len(seen),
         "inserted": inserted,
