@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # 指标计算（开发文档 §5.4：TA-Lib 主引擎 / pandas 降级）
     indicator_engine: str = "talib"  # talib | pandas
 
+    # 指标缓存（开发文档 §5.3/§5.4：模式 B，按交易日一版滚动保留）
+    indicator_cache_dir: str = "data/indicator_cache"
+    indicator_cache_keep_days: int = 3
+
     # 前端产物目录（单镜像由后端托管，开发文档 §8.1）
     frontend_dist: str = "frontend/dist"
 

@@ -4,3 +4,5 @@ pytest>=8.0
 pandas>=2.2
 numpy>=1.26
 TA-Lib>=0.4.32
+# T2.3 指标缓存 Parquet 读写
+pyarrow>=15
