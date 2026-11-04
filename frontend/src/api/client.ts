@@ -179,6 +179,7 @@ export interface StrategyItem {
 
 export interface ScanCandidate {
   code: string
+  name: string
   date: string | null
   matched: string[]
   metrics: Record<string, number | null>
@@ -218,6 +219,23 @@ export const strategyApi = {
     }),
   remove: (id: number) =>
     request<{ ok: boolean }>(`/api/selector/strategies/${id}`, { method: 'DELETE' }),
+}
+
+// ---------- 观察池（T3.4 / T5.4 联动） ----------
+export interface WatchItem {
+  id: number
+  code: string
+  name: string
+  dimension: string
+  created_at: string | null
+}
+
+export const watchlistApi = {
+  add: (code: string, name: string, dimension = '') =>
+    request<WatchItem>('/api/watchlist/add', {
+      method: 'POST',
+      body: JSON.stringify({ code, name, dimension }),
+    }),
 }
 
 export const healthApi = {

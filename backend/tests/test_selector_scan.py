@@ -6,7 +6,7 @@
 from datetime import date, timedelta
 
 from app.models.base import SessionLocal, init_db
-from app.models.market import StockFinIndicator, StockKline
+from app.models.market import StockFinIndicator, StockInfo, StockKline
 from app.models.system import TaskLog
 from app.services.factor_runtime import compute_factor, ema, rsi, sma
 from app.services.selector import run_scan
@@ -19,7 +19,7 @@ def setup_function():
 
 
 def _clean(db):
-    for model in (StockKline, StockFinIndicator, TaskLog):
+    for model in (StockKline, StockFinIndicator, StockInfo, TaskLog):
         db.query(model).delete()
     db.commit()
 
@@ -75,6 +75,8 @@ def test_scan_between_condition_and_matched_detail(tmp_path, monkeypatch):
         _no_cache(monkeypatch, tmp_path)
         _seed_kline(db, "600000", base=10.0)
         _seed_kline(db, "000001", base=20.0)
+        db.add(StockInfo(code="000001", name="平安银行"))
+        db.commit()
 
         out = run_scan(db, [{"factor": "ma5", "op": "between", "value": 0, "value2": 100}],
                        trade_date=D)
@@ -82,6 +84,8 @@ def test_scan_between_condition_and_matched_detail(tmp_path, monkeypatch):
         assert out["candidates"][0]["matched"] == ["ma5 ∈ [0, 100]"]
         for cand in out["candidates"]:
             assert 0 <= cand["metrics"]["ma5"] <= 100
+        names = {c["code"]: c["name"] for c in out["candidates"]}
+        assert names["000001"] == "平安银行" and names["600000"] == ""  # 名称补全（T5.4）
 
         # 窄区间只命中一只（000001 的 ma5 明显高于 600000）
         hi = [c for c in out["candidates"] if c["code"] == "000001"][0]["metrics"]["ma5"]

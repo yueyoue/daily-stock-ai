@@ -30,6 +30,7 @@ class ScanRequest(BaseModel):
 
 class Candidate(BaseModel):
     code: str
+    name: str = ""  # T5.4 结果表名称列（stock_info 补全）
     date: str | None = None
     matched: list[str]
     metrics: dict

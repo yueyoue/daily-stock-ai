@@ -19,7 +19,7 @@ import {
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useCallback, useEffect, useState } from 'react'
-import { selectorApi, strategyApi } from '../api/client'
+import { ApiError, selectorApi, strategyApi, watchlistApi } from '../api/client'
 import type { ScanCandidate, ScanResult, SelectorCondition, StrategyItem } from '../api/client'
 
 /** 选股器（T5.2 扫描 / T5.3 策略侧栏 / T5.4 结果表） */
@@ -65,6 +65,7 @@ export default function SelectorPage() {
   const [editingName, setEditingName] = useState('')
   const [saveOpen, setSaveOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [addedCodes, setAddedCodes] = useState<string[]>([])
 
   const loadStrategies = useCallback(async () => {
     try {
@@ -164,8 +165,29 @@ export default function SelectorPage() {
     }
   }
 
+  const addToWatch = async (c: ScanCandidate) => {
+    try {
+      await watchlistApi.add(c.code, c.name, editingName || '选股命中')
+      setAddedCodes((prev) => [...prev, c.code])
+      message.success(`${c.code} ${c.name} 已加入观察池`)
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 409) {
+        setAddedCodes((prev) => [...prev, c.code])
+        message.info(`${c.code} 已在观察池中`)
+      } else {
+        message.error(e instanceof Error ? e.message : '加入观察池失败')
+      }
+    }
+  }
+
   const columns: ColumnsType<ScanCandidate> = [
     { title: '代码', dataIndex: 'code', key: 'code', width: 100 },
+    {
+      title: '名称',
+      key: 'name',
+      width: 100,
+      render: (_, r) => r.name || '—',
+    },
     {
       title: '命中条件',
       key: 'matched',
@@ -180,13 +202,18 @@ export default function SelectorPage() {
     {
       title: '指标值',
       key: 'metrics',
-      render: (_, r) => (
-        <Space size={4} wrap>
-          {Object.entries(r.metrics).map(([k, v]) => (
-            <Tag key={k}>{k}={v === null || v === undefined ? '—' : Number(v).toFixed(3)}</Tag>
-          ))}
-        </Space>
-      ),
+      render: (_, r) => {
+        const condFactors = new Set((result?.conditions ?? []).map((c) => c.factor))
+        return (
+          <Space size={4} wrap>
+            {Object.entries(r.metrics).map(([k, v]) => (
+              <Tag key={k} color={condFactors.has(k) ? 'green' : undefined}>
+                {k}={v === null || v === undefined ? '—' : Number(v).toFixed(3)}
+              </Tag>
+            ))}
+          </Space>
+        )
+      },
     },
     {
       title: '实时兜底',
@@ -204,6 +231,19 @@ export default function SelectorPage() {
         ),
     },
     { title: '交易日', dataIndex: 'date', key: 'date', width: 110 },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 110,
+      render: (_, r) =>
+        addedCodes.includes(r.code) ? (
+          <Tag color="green">已入池</Tag>
+        ) : (
+          <Button size="small" onClick={() => void addToWatch(r)}>
+            加入观察池
+          </Button>
+        ),
+    },
   ]
 
   return (
