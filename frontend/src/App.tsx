@@ -7,9 +7,9 @@ import DashboardPage from './pages/DashboardPage'
 import MorningPage from './pages/MorningPage'
 import AfternoonPage from './pages/AfternoonPage'
 import TaskPage from './pages/TaskPage'
+import ConfigPage from './pages/ConfigPage'
 import {
   BacktestPage,
-  ConfigPage,
   HotPage,
   NewsPage,
   SelectorPage,
