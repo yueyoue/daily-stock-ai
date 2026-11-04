@@ -38,7 +38,7 @@ const fmtYi = (v: number | null | undefined): string =>
   v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}亿`
 
 function sentimentTone(score: number | null | undefined): string {
-  if (score === null) return '—'
+  if (score === null || score === undefined) return '—'
   if (score >= 70) return '偏强'
   if (score >= 50) return '中性偏强'
   if (score >= 30) return '中性偏弱'
