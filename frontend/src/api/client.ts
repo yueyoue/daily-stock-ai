@@ -30,6 +30,7 @@ export interface SessionUser {
   username: string
 }
 
+// ---------- 认证 ----------
 export const authApi = {
   login: (username: string, password: string) =>
     request<SessionUser>('/api/auth/login', {
@@ -43,6 +44,48 @@ export const authApi = {
       method: 'POST',
       body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
     }),
+}
+
+// ---------- 系统配置（T3.5） ----------
+export interface AppConfig {
+  tech_indicator_store: boolean
+  indicator_cache_days: number
+  indicator_engine: string
+  report_am_cron: string
+  report_pm_cron: string
+  llm_model: string
+  llm_api_key_masked: string
+}
+
+export const configApi = {
+  get: () => request<AppConfig>('/api/config/get'),
+  save: (payload: Partial<AppConfig> & { llm_api_key?: string }) =>
+    request<AppConfig>('/api/config/save', { method: 'POST', body: JSON.stringify(payload) }),
+}
+
+// ---------- 采集与任务 ----------
+export interface TaskItem {
+  id: number
+  task_name: string
+  status: string
+  duration_ms: number
+  message: string
+  created_at: string | null
+}
+
+export const collectApi = {
+  trigger: (mode: 'full' | 'incremental' | 'single' = 'incremental', dataType?: string) =>
+    request<{ task_id: number; status: string; mode: string; data_type: string | null }>(
+      '/api/collect/trigger',
+      { method: 'POST', body: JSON.stringify({ mode, data_type: dataType ?? null }) },
+    ),
+}
+
+export const taskApi = {
+  latest: (pageSize = 3) =>
+    request<{ items: TaskItem[]; total: number; page: number; page_size: number }>(
+      `/api/task/status?page=1&page_size=${pageSize}`,
+    ),
 }
 
 export const healthApi = {

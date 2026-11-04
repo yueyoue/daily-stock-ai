@@ -1,6 +1,7 @@
-import { Layout, Menu, Typography } from 'antd'
+import { Button, Layout, Menu, Space, Tag, Typography, message } from 'antd'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { authApi } from '../api/client'
+import { authApi, collectApi, configApi, taskApi } from '../api/client'
 import { useCurrentUser } from './RequireAuth'
 
 const { Sider, Header, Content } = Layout
@@ -22,9 +23,42 @@ const MENU = [
   { key: '/config', label: <NavLink to="/config">系统配置</NavLink> },
 ]
 
+/**
+ * 工作台布局（T4.2，对齐原型顶栏）：
+ * 交易日 / 模型 / 采集任务状态 / 手动触发采集 / 侧栏折叠 / 退出
+ */
 export default function AppLayout() {
   const navigate = useNavigate()
   const user = useCurrentUser()
+  const [collapsed, setCollapsed] = useState(false)
+  const [model, setModel] = useState<string>('—')
+  const [collecting, setCollecting] = useState(false)
+  const [lastTask, setLastTask] = useState<string>('空闲')
+
+  useEffect(() => {
+    configApi
+      .get()
+      .then((c) => setModel(c.llm_model))
+      .catch(() => setModel('未知'))
+    taskApi.latest(1).then((p) => {
+      const t = p.items[0]
+      if (t) setLastTask(t.status === 'running' ? '运行中' : '空闲')
+    }).catch(() => undefined)
+  }, [])
+
+  const triggerCollect = async () => {
+    setCollecting(true)
+    setLastTask('运行中')
+    try {
+      const r = await collectApi.trigger('incremental')
+      message.success(`采集任务已触发（task_id=${r.task_id}）`)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '触发失败')
+      setLastTask('空闲')
+    } finally {
+      setCollecting(false)
+    }
+  }
 
   const logout = async () => {
     try {
@@ -36,10 +70,17 @@ export default function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider theme="dark" width={220}>
-        <div style={{ padding: 16, color: '#e2e8f0', fontWeight: 700 }}>
+      <Sider
+        theme="dark"
+        width={220}
+        collapsedWidth={64}
+        collapsed={collapsed}
+        trigger={null}
+        collapsible
+      >
+        <div style={{ padding: 16, color: '#e2e8f0', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden' }}>
           <Link to="/" style={{ color: '#e2e8f0' }}>
-            📈 DailyStockAI
+            📈 {collapsed ? 'DSA' : 'DailyStockAI'}
           </Link>
         </div>
         <Menu theme="dark" mode="inline" items={MENU} />
@@ -49,13 +90,38 @@ export default function AppLayout() {
           style={{
             background: '#162138',
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             alignItems: 'center',
-            gap: 16,
+            paddingInline: 24,
           }}
         >
-          <Typography.Text type="secondary">{user?.username}</Typography.Text>
-          <Typography.Link onClick={logout}>退出</Typography.Link>
+          <Space size="middle">
+            <Button
+              type="text"
+              style={{ color: '#cbd5e1' }}
+              onClick={() => setCollapsed(!collapsed)}
+              aria-label="折叠侧栏"
+            >
+              ☰
+            </Button>
+            <Typography.Text type="secondary">
+              交易日：<Typography.Text>{new Date().toLocaleDateString('zh-CN')}</Typography.Text>
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              模型：<Typography.Text type="success">{model}</Typography.Text>
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              采集任务：
+              <Tag color={lastTask === '运行中' ? 'processing' : 'success'}>{lastTask}</Tag>
+            </Typography.Text>
+          </Space>
+          <Space size="middle">
+            <Button type="primary" loading={collecting} onClick={triggerCollect}>
+              手动触发采集
+            </Button>
+            <Typography.Text type="secondary">{user?.username}</Typography.Text>
+            <Typography.Link onClick={logout}>退出</Typography.Link>
+          </Space>
         </Header>
         <Content style={{ padding: 24, background: '#0b1120' }}>
           <Outlet />
