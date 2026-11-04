@@ -22,8 +22,17 @@ from app.services.tech_indicators import FLAT_KEYS, get_engine
 logger = logging.getLogger("app.indicator_store")
 
 
-def store_mode_enabled() -> bool:
-    """模式 A 开关（§5.4 技术指标入库开关，默认关=模式 B）。"""
+def store_mode_enabled(db: Session | None = None) -> bool:
+    """模式 A 开关（§5.4 技术指标入库开关，默认关=模式 B）。
+
+    系统配置页可运行时切换（system_config 覆盖层，T3.5）；不传 db 时读环境变量默认值。
+    """
+    if db is not None:
+        from app.services.config_store import get_override
+
+        override = get_override(db, "tech_indicator_store")
+        if override is not None:
+            return bool(override)
     return bool(get_settings().tech_indicator_store)
 
 
@@ -115,7 +124,7 @@ def get_code_indicators(db: Session, code: str, trade_date=None,
     metrics = None
     source = None
 
-    if store_mode_enabled():  # 模式 A：库表
+    if store_mode_enabled(db):  # 模式 A：库表
         if trade_date is not None:
             row = db.get(StockTechIndicator, (code, trade_date))
         else:  # 未指定日期 → 取最新
@@ -142,7 +151,7 @@ def get_code_indicators(db: Session, code: str, trade_date=None,
         source = "realtime"
         trade_date = trade_date or calc_date
         _warn_fallback(db, code,
-                       f"mode={'A' if store_mode_enabled() else 'B'} "
+                       f"mode={'A' if store_mode_enabled(db) else 'B'} "
                        f"date={trade_date or 'latest'} 缺缓存/缺因子，已实时计算兜底")
 
     return {"code": code, "date": trade_date, "source": source, "metrics": metrics}

@@ -10,6 +10,8 @@ from app.api.auth import router as auth_router
 from app.api.backtest import router as backtest_router
 from app.api.collect import router as collect_router
 from app.api.dashboard import router as dashboard_router
+from app.api.config import router as config_router
+from app.api.datasource import router as datasource_router
 from app.api.deps import require_user
 from app.api.health import router as health_router
 from app.api.hot import router as hot_router
@@ -80,6 +82,8 @@ app.include_router(hot_router, dependencies=[Depends(require_user)])
 app.include_router(news_router, dependencies=[Depends(require_user)])
 app.include_router(watchlist_router, dependencies=[Depends(require_user)])
 app.include_router(task_router, dependencies=[Depends(require_user)])
+app.include_router(config_router, dependencies=[Depends(require_user)])
+app.include_router(datasource_router, dependencies=[Depends(require_user)])
 
 
 @app.get("/docs", include_in_schema=False)

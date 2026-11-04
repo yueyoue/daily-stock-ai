@@ -10,6 +10,7 @@ from app.models.market import (
     StockTechIndicator,
 )
 from app.models.content import HotTopic, News, Report, WatchList
+from app.models.config import SystemConfig
 from app.models.system import (
     BacktestRecord,
     DataReconcile,
@@ -37,6 +38,7 @@ __all__ = [
     "HotTopic",
     "News",
     "WatchList",
+    "SystemConfig",
     "DataSourceConfig",
     "DataSourceLog",
     "DataReconcile",
