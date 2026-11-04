@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.models.market import StockFinIndicator, StockKline
+from app.models.market import StockFinIndicator, StockInfo, StockKline
 from app.schemas.selector import FIN_FACTORS, FactorCondition, ScanSpec
 from app.services.factor_runtime import compute_factor
 from app.services.indicator_query import (
@@ -148,11 +148,22 @@ def run_scan(db: Session, conditions: list[dict], trade_date=None) -> dict:
         metrics.update(runtime_values.get(r["code"], {}))
         candidates.append({
             "code": r["code"],
+            "name": "",
             "date": r.get("date"),
             "matched": [c.describe() for c in spec.conditions],
             "metrics": metrics,
             "runtime_computed": sorted(runtime_values.get(r["code"], {})),
         })
+
+    # 名称补全（T5.4 结果表）：stock_info 批量查，分块兼容 SQLite 参数上限
+    codes = [c["code"] for c in candidates]
+    names: dict[str, str] = {}
+    for i in range(0, len(codes), 500):
+        chunk = codes[i:i + 500]
+        names.update(dict(db.query(StockInfo.code, StockInfo.name)
+                          .filter(StockInfo.code.in_(chunk)).all()))
+    for c in candidates:
+        c["name"] = names.get(c["code"], "")
 
     scan_ms = int((time.monotonic() - started) * 1000)
     logger.info("选股扫描：%d 条件（技术%d/财务%d/实时%d），%d 候选，耗时 %dms（预算 %.0fs）",
