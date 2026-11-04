@@ -1,5 +1,7 @@
 """T3.5 验收：配置接口（Key 掩码只进不出、范围校验、覆盖层生效）。"""
 import os
+import sys
+import types
 
 import pytest
 
@@ -102,3 +104,36 @@ def test_override_takes_effect_for_store_mode():
         assert store_mode_enabled() is False    # 无 db 仍读环境默认
     finally:
         db.close()
+
+
+# ---------- LLM 连通测试（T4.9） ----------
+
+def test_test_llm_requires_key(client):
+    init_db()
+    _login(client)
+    r = client.post("/api/config/test_llm")
+    assert r.status_code == 400 and "API Key" in r.json()["message"]
+
+
+def test_test_llm_ok_and_error_scrubbed(client, monkeypatch):
+    init_db()
+    _login(client)
+    secret = "sk-secret-9876aaaa"
+    client.post("/api/config/save", json={"llm_api_key": secret, "llm_model": "qwen-plus"})
+
+    stub = types.ModuleType("litellm")
+
+    def failing(**kw):
+        raise RuntimeError(f"auth failed for {secret}")
+
+    stub.completion = failing
+    monkeypatch.setitem(sys.modules, "litellm", stub)
+    r = client.post("/api/config/test_llm")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False and "****" in body["error"]
+    assert secret not in r.text  # 错误信息已脱敏，无 Key 明文
+
+    stub.completion = lambda **kw: {"choices": []}
+    r2 = client.post("/api/config/test_llm")
+    assert r2.json() == {"ok": True, "model": "qwen-plus"}

@@ -61,6 +61,10 @@ export const configApi = {
   get: () => request<AppConfig>('/api/config/get'),
   save: (payload: Partial<AppConfig> & { llm_api_key?: string }) =>
     request<AppConfig>('/api/config/save', { method: 'POST', body: JSON.stringify(payload) }),
+  testLlm: () =>
+    request<{ ok: boolean; model?: string; error?: string }>('/api/config/test_llm', {
+      method: 'POST',
+    }),
 }
 
 // ---------- 采集与任务 ----------

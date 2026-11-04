@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.models.base import get_db
 from app.services.config_store import get_config, save_config
+from app.services.llm import probe_llm
 
 router = APIRouter(prefix="/api/config", tags=["config"])
 
@@ -30,3 +31,9 @@ def config_get(db: Session = Depends(get_db)):
 def config_save(payload: ConfigUpdate, db: Session = Depends(get_db)):
     data = {k: v for k, v in payload.model_dump().items() if v is not None}
     return save_config(db, **data)
+
+
+@router.post("/test_llm")
+def config_test_llm(db: Session = Depends(get_db)):
+    """LLM 连通测试（T4.9）：最小 completion 调用，响应不含 Key 明文。"""
+    return probe_llm(db)

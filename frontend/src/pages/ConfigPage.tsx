@@ -13,6 +13,7 @@ import {
 import { useEffect, useState } from 'react'
 import { configApi } from '../api/client'
 import DataSourcePanel from '../components/DataSourcePanel'
+import ModelAccountPanel from '../components/ModelAccountPanel'
 
 /** 系统配置（T4.7 存储与性能 / T4.8 数据源接口 / T4.9 模型·账号·定时） */
 
@@ -66,7 +67,7 @@ export default function ConfigPage() {
       </Typography.Paragraph>
 
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={16}>
+        <Col xs={24} lg={14}>
           <Card title="存储与性能" loading={loading}>
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               {/* 技术指标入库开关（模式 A/B） */}
@@ -130,6 +131,11 @@ export default function ConfigPage() {
               </Button>
             </Space>
           </Card>
+        </Col>
+
+        {/* 模型 / 账号 / 定时任务（T4.9） */}
+        <Col xs={24} lg={10}>
+          <ModelAccountPanel />
         </Col>
 
         {/* 数据源接口配置（T4.8） */}
