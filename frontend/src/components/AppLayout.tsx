@@ -77,6 +77,8 @@ export default function AppLayout() {
         collapsed={collapsed}
         trigger={null}
         collapsible
+        breakpoint="lg"
+        onBreakpoint={(c) => setCollapsed(c)}
       >
         <div style={{ padding: 16, color: '#e2e8f0', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden' }}>
           <Link to="/" style={{ color: '#e2e8f0' }}>

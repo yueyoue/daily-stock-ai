@@ -331,6 +331,7 @@ export default function DataSourcePanel() {
         columns={columns}
         dataSource={items}
         pagination={false}
+        scroll={{ x: 950 }}
       />
       <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12, marginBottom: 0 }}>
         💡 采集器按“数据类型 → 启用中优先级最高”自动选路，主源失败自动降级到备源，切换过程记录到

@@ -234,6 +234,7 @@ export default function TaskPage() {
           columns={columns}
           dataSource={items}
           expandable={expandable}
+          scroll={{ x: 800 }}
           pagination={{
             current: page,
             pageSize,

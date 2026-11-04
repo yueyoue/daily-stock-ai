@@ -99,8 +99,8 @@ export default function ReportViewer({
         <Typography.Text type="secondary">{subtitle}</Typography.Text>
       </div>
 
-      <Row gutter={16}>
-        <Col span={6}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} sm={8} lg={6}>
           <Card title="历史报告" styles={{ body: { padding: 12 } }}>
             {loading ? (
               <div style={{ textAlign: 'center', padding: 24 }}>
@@ -141,7 +141,7 @@ export default function ReportViewer({
             </Button>
           </Card>
         </Col>
-        <Col span={18}>
+        <Col xs={24} sm={16} lg={18}>
           <Card
             title={
               selected

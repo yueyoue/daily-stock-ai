@@ -9,11 +9,17 @@ export class ApiError extends Error {
 }
 
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(path, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    })
+  } catch {
+    // 断网/跨域等 fetch 层异常：统一友好提示，页面不白屏（T4.10）
+    throw new ApiError(-1, '网络连接失败，请检查网络后重试')
+  }
   let data: { code?: number; message?: string } = {}
   try {
     data = await res.json()

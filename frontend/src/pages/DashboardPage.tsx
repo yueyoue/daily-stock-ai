@@ -1,5 +1,5 @@
-import { Card, Col, Empty, Row, Select, Spin, Typography } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { Button, Card, Col, Empty, Row, Select, Spin, Typography } from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { request } from '../api/client'
 import type { EChartsOption } from 'echarts'
 import EChart from '../components/EChart'
@@ -51,16 +51,22 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     setLoading(true)
-    request<DashboardMarket>(`/api/dashboard/market?days=${days}`)
-      .then((d) => {
-        setData(d)
-        setError(null)
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : '加载失败'))
-      .finally(() => setLoading(false))
+    try {
+      const d = await request<DashboardMarket>(`/api/dashboard/market?days=${days}`)
+      setData(d)
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '加载失败')
+    } finally {
+      setLoading(false)
+    }
   }, [days])
+
+  useEffect(() => {
+    void load()
+  }, [load])
 
   const trendOption = useMemo<EChartsOption>(
     () => ({
@@ -138,11 +144,14 @@ export default function DashboardPage() {
       {error && (
         <Card style={{ marginBottom: 16, borderColor: '#ef4444' }}>
           <Typography.Text type="danger">{error}</Typography.Text>
+          <Button size="small" style={{ marginLeft: 12 }} onClick={() => void load()}>
+            重试
+          </Button>
         </Card>
       )}
 
-      <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={12} lg={6}>
           <Card>
             <Typography.Text type="secondary">市场情绪得分</Typography.Text>
             <div style={{ fontSize: 32, fontWeight: 700, color: '#f59e0b' }}>
@@ -151,7 +160,7 @@ export default function DashboardPage() {
             <Typography.Text type="secondary">{sentimentTone(data?.sentiment_score)}</Typography.Text>
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card>
             <Typography.Text type="secondary">涨停家数</Typography.Text>
             <div style={{ fontSize: 32, fontWeight: 700, color: '#10b981' }}>
@@ -162,7 +171,7 @@ export default function DashboardPage() {
             </Typography.Text>
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card>
             <Typography.Text type="secondary">主力资金</Typography.Text>
             <div
@@ -177,7 +186,7 @@ export default function DashboardPage() {
             <Typography.Text type="secondary">当日净流入（东财口径）</Typography.Text>
           </Card>
         </Col>
-        <Col span={6}>
+        <Col xs={12} sm={12} lg={6}>
           <Card>
             <Typography.Text type="secondary">涨跌家数</Typography.Text>
             <div style={{ fontSize: 32, fontWeight: 700 }}>
@@ -190,8 +199,8 @@ export default function DashboardPage() {
         </Col>
       </Row>
 
-      <Row gutter={16}>
-        <Col span={16}>
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={16}>
           <Card
             title="情绪趋势曲线"
             extra={
@@ -213,7 +222,7 @@ export default function DashboardPage() {
             )}
           </Card>
         </Col>
-        <Col span={8}>
+        <Col xs={24} lg={8}>
           <Card title="主线板块资金">
             {data?.main_sectors?.length ? (
               <EChart option={sectorOption} height={260} />
