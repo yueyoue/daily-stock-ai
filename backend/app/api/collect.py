@@ -2,7 +2,7 @@
 
 POST /api/collect/trigger 异步执行采集流水线，立即返回 task_id（task_log 顶层任务行）。
 模式：full（全量）/ incremental（日更）/ single（单数据类型）。
-任务执行为进程内后台任务（T3.6 将升级为完整任务队列与重试）。
+任务执行统一走 task_runner（T3.6）：失败自动重试 3 次（指数退避）+ 全败告警。
 """
 import logging
 from datetime import date
@@ -14,8 +14,9 @@ from sqlalchemy.orm import Session
 from app.core.auth import require_user
 from app.core.errors import AppError
 from app.models.admin_user import AdminUser
-from app.models.base import SessionLocal, get_db
+from app.models.base import get_db
 from app.services.pipeline import MODES, SINGLE_TYPES, log_stage, run_pipeline
+from app.services.task_runner import run_task
 
 logger = logging.getLogger("app.api.collect")
 
@@ -28,14 +29,12 @@ class CollectTriggerRequest(BaseModel):
 
 
 def _run_task(task_id: int, mode: str, data_type: str | None) -> None:
-    """后台执行：独立会话跑流水线，异常记 task_log 不外抛。"""
-    db = SessionLocal()
-    try:
-        run_pipeline(db, mode, data_type, task_id=task_id)
-    except Exception as e:  # noqa: BLE001 后台任务异常统一记日志
-        logger.error("采集任务 %s 失败: %s", task_id, e)
-    finally:
-        db.close()
+    """后台执行：统一任务执行器（T3.6）——失败 3 次指数退避重试 + 全败告警，task_log 全覆盖。"""
+    run_task(
+        f"采集任务:{mode}" + (f":{data_type}" if data_type else ""),
+        lambda db, **kw: run_pipeline(db, mode, data_type, task_id=task_id),
+        task_id=task_id,
+    )
 
 
 @router.post("/trigger")

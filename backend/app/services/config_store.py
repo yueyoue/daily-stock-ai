@@ -62,6 +62,12 @@ def get_override(db: Session, key: str):
     return None if row is None else row.value
 
 
+def get_effective(db: Session, key: str):
+    """生效值 = 运行时覆盖 > Settings 环境变量 > 规格默认值。"""
+    override = get_override(db, key)
+    return override if override is not None else _default(key)
+
+
 def get_config(db: Session) -> dict:
     """配置视图：默认值 + 运行时覆盖；LLM Key 以掩码字段返回（无明文字段）。"""
     overrides = {r.key: r.value for r in db.query(SystemConfig).all()}
