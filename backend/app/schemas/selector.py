@@ -69,7 +69,7 @@ class FactorCondition(BaseModel):
     @classmethod
     def _check_op(cls, v: str) -> str:
         if v not in ALL_OPS:
-            raise ValueError(f"不支持的比较符: {v}（可用: {', '.join(ALL_OPS)}）")
+            raise ValueError(f"未知比较符: {v}（可用: {', '.join(ALL_OPS)}）")
         return v
 
     @model_validator(mode="after")

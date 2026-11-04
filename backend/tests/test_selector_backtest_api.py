@@ -61,7 +61,7 @@ def test_scan_candidates_and_match_detail(client, tmp_path, monkeypatch):
         assert r.status_code == 200
         body = r.json()
         assert body["total"] == 1 and body["candidates"][0]["code"] == "000001"
-        assert body["candidates"][0]["matched"] == ["ma5 > 15.0"]
+        assert body["candidates"][0]["matched"] == ["ma5 > 15"]  # describe() 人读格式（T5.2 接入）
         assert body["candidates"][0]["metrics"]["ma5"] > 15
         assert body["scan_ms"] >= 0 and body["budget_s"] == 20.0
 
@@ -94,7 +94,7 @@ def test_scan_timeout_returns_504(client, tmp_path, monkeypatch):
             time.sleep(0.05)
             return []
 
-        monkeypatch.setattr(sel, "scan_factor", slow_scan)
+        monkeypatch.setattr(sel, "_slow_snapshot", slow_scan)  # T5.2 起缺缓存入口
         monkeypatch.setenv("SELECTOR_SCAN_BUDGET_S", "0.01")
         get_settings.cache_clear()
         try:

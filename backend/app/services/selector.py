@@ -1,24 +1,35 @@
-"""选股扫描服务（T3.3 API 层骨架；全市场扫描执行器 T5.2 完整实现）。
+"""全市场扫描执行器（T5.2，开发文档 §4 模块4）。
 
-- conditions：[{factor, op, value}] AND 组合（T5.1 将扩展区间/财务因子 DSL）
-- 目前基于 T2.5 scan_factor（指标缓存快照）；缺缓存慢路径兜底已内建
-- **20 秒预算看门狗**（§4 模块4）：超预算抛 504，明确错误返回
+- 条件走 T5.1 DSL（财务因子/技术因子 × 比较符 × 阈值/区间，AND）
+- 扫描走**指标缓存快照**（不联网，模式 B 缓存 / 模式 A 库表）；缺缓存慢路径实时计算
+- 财务因子取 stock_fin_indicator 最新报告期（≤ trade_date）
+- 清单外因子（族内自定义参数）→ 幸存候选上实时计算兜底并**标注**（§5.3）
+- **20 秒预算监控**：阶段间检查，超预算抛 504 明确错误
+- 输出：候选池 + 匹配条件明细（describe）+ 因子取值 + 兜底标注
 """
 from __future__ import annotations
 
 import logging
 import time
+from datetime import date
 
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import AppError
-from app.services.indicator_query import _OPS as SCAN_OPS, scan_factor
-from app.services.tech_indicators import FLAT_KEYS
+from app.models.market import StockFinIndicator, StockKline
+from app.schemas.selector import FIN_FACTORS, FactorCondition, ScanSpec
+from app.services.factor_runtime import compute_factor
+from app.services.indicator_query import (
+    _OPS as COMPARE_OPS,
+    _slow_snapshot,
+    factor_snapshot,
+)
 
 logger = logging.getLogger("app.selector")
 
-_OPS = (">", ">=", "<", "<=", "==", "!=")
+RUNTIME_BARS = 260  # 实时兜底计算窗口（约一年日线）
 
 
 def _ensure_budget(deadline: float, budget_s: float) -> None:
@@ -26,43 +37,134 @@ def _ensure_budget(deadline: float, budget_s: float) -> None:
         raise AppError(504, f"扫描超时（超过 {budget_s:g}s 预算），请收紧条件后重试")
 
 
+def _match_value(value: float | None, c: FactorCondition) -> bool:
+    """单因子命中判定（含 between 区间）。None 值视为不命中。"""
+    if value is None:
+        return False
+    if c.op == "between":
+        return c.value <= value <= c.value2
+    return COMPARE_OPS[c.op](value, c.value)
+
+
+def _fin_factor_map(db: Session, codes: list[str], factors: set[str],
+                    trade_date: date | None) -> dict[str, dict[str, float]]:
+    """最新报告期（≤ trade_date）财务因子取值；分块查询（SQLite 参数上限）。"""
+    named = {"roe", "gross_margin", "net_margin", "debt_to_asset", "ocf_to_profit"}
+    out: dict[str, dict[str, float]] = {}
+    for i in range(0, len(codes), 500):
+        chunk = codes[i:i + 500]
+        q = db.query(StockFinIndicator).filter(StockFinIndicator.code.in_(chunk))
+        if trade_date is not None:
+            q = q.filter(StockFinIndicator.report_date <= trade_date)
+        rows = q.order_by(StockFinIndicator.code.asc(), desc(StockFinIndicator.report_date)).all()
+        for r in rows:
+            if r.code in out:
+                continue  # 已取到该标的最新报告期
+            vals: dict[str, float] = {}
+            for f in factors:
+                v = getattr(r, f) if f in named else None
+                if v is None:
+                    v = (r.metrics or {}).get(f)  # T2.1 metrics 含全量 30 项，双路取值
+                if v is not None:
+                    vals[f] = float(v)
+            out[r.code] = vals
+    return out
+
+
+def _runtime_series(db: Session, code: str, trade_date: date | None) -> dict[str, list[float]]:
+    """取最近 RUNTIME_BARS 根 K 线（≤ trade_date）作实时兜底计算输入。"""
+    q = db.query(StockKline).filter(StockKline.code == code)
+    if trade_date is not None:
+        q = q.filter(StockKline.date <= trade_date)
+    rows = q.order_by(desc(StockKline.date)).limit(RUNTIME_BARS).all()
+    rows.reverse()
+    return {
+        "closes": [r.close for r in rows],
+        "highs": [r.high for r in rows],
+        "lows": [r.low for r in rows],
+        "volumes": [r.volume for r in rows],
+    }
+
+
 def run_scan(db: Session, conditions: list[dict], trade_date=None) -> dict:
     """执行扫描，返回候选池 + 匹配条件明细（同步，超预算 504）。"""
-    if not conditions:
-        raise AppError(400, "conditions 不能为空")
-    for c in conditions:
-        if c.get("factor") not in FLAT_KEYS:
-            raise AppError(400, f"未知因子: {c.get('factor')}；"
-                                "T5.1 前仅支持技术因子（INDICATOR_SPEC 清单）")
-        if c.get("op") not in _OPS:
-            raise AppError(400, f"未知比较符: {c.get('op')}；可用 {list(_OPS)}")
+    try:
+        spec = ScanSpec.parse({"logic": "and", "conditions": conditions or []})
+    except Exception as e:  # noqa: BLE001 DSL 校验错误 → 400 明确提示
+        raise AppError(400, str(e))
 
     budget_s = float(get_settings().selector_scan_budget_s)
     started, deadline = time.monotonic(), time.monotonic() + budget_s
 
-    # 首条件走缓存索引（scan_factor），其余条件行级 AND 过滤
-    first, rest = conditions[0], conditions[1:]
-    rows = scan_factor(db, first["factor"], first["op"], first["value"],
-                       trade_date=trade_date)
-    _ensure_budget(deadline, budget_s)
-    for c in rest:
-        fn = SCAN_OPS[c["op"]]
-        rows = [r for r in rows if r.get(c["factor"]) is not None
-                and fn(r[c["factor"]], c["value"])]
+    tech_conds = [c for c in spec.conditions if not c.needs_runtime and c.factor not in FIN_FACTORS]
+    fin_conds = [c for c in spec.conditions if c.factor in FIN_FACTORS]
+    runtime_conds = [c for c in spec.conditions if c.needs_runtime]
+    warnings: list[str] = []
+
+    # ① 技术因子：缓存/库表快照（不联网），缺缓存走实时计算慢路径
+    snap = factor_snapshot(db, trade_date)
+    source = (snap or {}).get("meta", {}).get("source", "realtime") if snap else "realtime"
+    rows = snap["rows"] if snap else _slow_snapshot(db, trade_date)
+    for c in tech_conds:
+        rows = [r for r in rows if _match_value(r.get(c.factor), c)]
         _ensure_budget(deadline, budget_s)
 
-    candidates = [
-        {
+    # ② 财务因子：最新报告期（≤ trade_date）
+    fin_map: dict[str, dict[str, float]] = {}
+    if fin_conds and rows:
+        fin_map = _fin_factor_map(db, [r["code"] for r in rows],
+                                  {c.factor for c in fin_conds}, trade_date)
+        for c in fin_conds:
+            rows = [r for r in rows
+                    if _match_value(fin_map.get(r["code"], {}).get(c.factor), c)]
+            _ensure_budget(deadline, budget_s)
+
+    # ③ 清单外因子：幸存候选逐标的实时计算兜底（标注）
+    runtime_values: dict[str, dict[str, float]] = {}
+    if runtime_conds and rows:
+        warnings.append(f"{len(rows)} 只候选 × {len(runtime_conds)} 个清单外因子走实时计算兜底")
+        survived = []
+        for r in rows:
+            series = _runtime_series(db, r["code"], trade_date)
+            vals: dict[str, float] = {}
+            ok = True
+            for c in runtime_conds:
+                v = compute_factor(c.factor, series["closes"], series["highs"],
+                                   series["lows"], series["volumes"])
+                if not _match_value(v, c):
+                    ok = False
+                    break
+                vals[c.factor] = v
+            if ok:
+                runtime_values[r["code"]] = vals
+                survived.append(r)
+            _ensure_budget(deadline, budget_s)
+        rows = survived
+
+    candidates = []
+    for r in rows:
+        metrics = {c.factor: r.get(c.factor) for c in tech_conds}
+        metrics.update({c.factor: fin_map.get(r["code"], {}).get(c.factor) for c in fin_conds})
+        metrics.update(runtime_values.get(r["code"], {}))
+        candidates.append({
             "code": r["code"],
             "date": r.get("date"),
-            "matched": [f"{c['factor']} {c['op']} {c['value']}" for c in conditions],
-            "metrics": {c["factor"]: r.get(c["factor"]) for c in conditions},
-        }
-        for r in rows
-    ]
+            "matched": [c.describe() for c in spec.conditions],
+            "metrics": metrics,
+            "runtime_computed": sorted(runtime_values.get(r["code"], {})),
+        })
+
     scan_ms = int((time.monotonic() - started) * 1000)
-    logger.info("选股扫描：%d 条件，%d 候选，耗时 %dms（预算 %.0fs）",
-                len(conditions), len(candidates), scan_ms, budget_s)
-    return {"scan_ms": scan_ms, "budget_s": budget_s,
-            "conditions": conditions, "total": len(candidates),
-            "candidates": candidates}
+    logger.info("选股扫描：%d 条件（技术%d/财务%d/实时%d），%d 候选，耗时 %dms（预算 %.0fs）",
+                len(spec.conditions), len(tech_conds), len(fin_conds), len(runtime_conds),
+                len(candidates), scan_ms, budget_s)
+    return {
+        "scan_ms": scan_ms,
+        "budget_s": budget_s,
+        "conditions": [c.model_dump() for c in spec.conditions],
+        "trade_date": trade_date.isoformat() if trade_date else None,
+        "snapshot_source": source,
+        "warnings": warnings,
+        "total": len(candidates),
+        "candidates": candidates,
+    }
