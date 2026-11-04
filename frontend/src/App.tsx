@@ -3,11 +3,11 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
+import DashboardPage from './pages/DashboardPage'
 import {
   AfternoonPage,
   BacktestPage,
   ConfigPage,
-  DashboardPage,
   HotPage,
   MorningPage,
   NewsPage,

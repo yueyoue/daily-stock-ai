@@ -1,7 +1,6 @@
 import Placeholder from '../components/Placeholder'
 
-// T4.x 起拆分为独立页面文件并接真实数据
-export const DashboardPage = () => <Placeholder title="大盘仪表盘" task="T4.3" />
+// T4.x 起拆分为独立页面文件并接真实数据（DashboardPage 已拆出 → pages/DashboardPage.tsx）
 export const MorningPage = () => <Placeholder title="盘前早报" task="T4.4" />
 export const AfternoonPage = () => <Placeholder title="盘后复盘" task="T4.5" />
 export const SelectorPage = () => <Placeholder title="选股器" task="T5.2/T5.4" />
