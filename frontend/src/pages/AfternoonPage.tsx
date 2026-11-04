@@ -1,6 +1,7 @@
 import { Card, Col, Empty, Row } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { request } from '../api/client'
+import type { EChartsOption } from 'echarts'
 import EChart from '../components/EChart'
 import ReportViewer from '../components/ReportViewer'
 
@@ -20,7 +21,7 @@ export default function AfternoonPage() {
       .catch(() => setBrief(null))
   }, [])
 
-  const chartOption = useMemo(
+  const chartOption = useMemo<EChartsOption>(
     () => ({
       tooltip: { trigger: 'axis' as const },
       grid: { left: 50, right: 20, top: 20, bottom: 30 },

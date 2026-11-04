@@ -1,6 +1,7 @@
 import { Card, Col, Empty, Row, Select, Spin, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { request } from '../api/client'
+import type { EChartsOption } from 'echarts'
 import EChart from '../components/EChart'
 
 /** 大盘仪表盘（T4.3，开发文档 §3.2）：四卡片 + 情绪趋势 + 主线板块资金 */
@@ -36,7 +37,7 @@ const fmt = (v: number | null | undefined, suffix = ''): string =>
 const fmtYi = (v: number | null | undefined): string =>
   v === null || v === undefined ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}亿`
 
-function sentimentTone(score: number | null): string {
+function sentimentTone(score: number | null | undefined): string {
   if (score === null) return '—'
   if (score >= 70) return '偏强'
   if (score >= 50) return '中性偏强'
@@ -61,7 +62,7 @@ export default function DashboardPage() {
       .finally(() => setLoading(false))
   }, [days])
 
-  const trendOption = useMemo(
+  const trendOption = useMemo<EChartsOption>(
     () => ({
       tooltip: { trigger: 'axis' },
       grid: { left: 40, right: 20, top: 20, bottom: 30 },
@@ -90,7 +91,7 @@ export default function DashboardPage() {
     [data?.sentiment_trend],
   )
 
-  const sectorOption = useMemo(() => {
+  const sectorOption = useMemo<EChartsOption>(() => {
     const sectors = data?.main_sectors ?? []
     return {
       tooltip: { trigger: 'axis' as const },
