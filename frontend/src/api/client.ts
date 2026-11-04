@@ -162,6 +162,64 @@ export const datasourceApi = {
     ),
 }
 
+// ---------- 选股器（T5.1 DSL / T5.2 扫描 / T5.3 策略） ----------
+export interface SelectorCondition {
+  factor: string
+  op: string
+  value: number
+  value2?: number | null
+}
+
+export interface StrategyItem {
+  id: number
+  name: string
+  conditions: SelectorCondition[]
+  created_at: string | null
+}
+
+export interface ScanCandidate {
+  code: string
+  date: string | null
+  matched: string[]
+  metrics: Record<string, number | null>
+  runtime_computed: string[]
+}
+
+export interface ScanResult {
+  scan_ms: number
+  budget_s: number
+  conditions: SelectorCondition[]
+  trade_date: string | null
+  snapshot_source: string
+  warnings: string[]
+  total: number
+  candidates: ScanCandidate[]
+}
+
+export const selectorApi = {
+  scan: (conditions: SelectorCondition[], tradeDate?: string) =>
+    request<ScanResult>('/api/selector/scan', {
+      method: 'POST',
+      body: JSON.stringify({ conditions, trade_date: tradeDate ?? null }),
+    }),
+}
+
+export const strategyApi = {
+  list: () => request<{ items: StrategyItem[]; total: number }>('/api/selector/strategies'),
+  create: (name: string, conditions: SelectorCondition[]) =>
+    request<StrategyItem>('/api/selector/strategies', {
+      method: 'POST',
+      body: JSON.stringify({ name, conditions }),
+    }),
+  update: (id: number, name: string, conditions: SelectorCondition[]) =>
+    request<StrategyItem>(`/api/selector/strategies/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name, conditions }),
+    }),
+  remove: (id: number) =>
+    request<{ ok: boolean }>(`/api/selector/strategies/${id}`, { method: 'DELETE' }),
+}
+
 export const healthApi = {
   check: () => request<{ status: string }>('/api/health'),
 }

@@ -8,11 +8,11 @@ import MorningPage from './pages/MorningPage'
 import AfternoonPage from './pages/AfternoonPage'
 import TaskPage from './pages/TaskPage'
 import ConfigPage from './pages/ConfigPage'
+import SelectorPage from './pages/SelectorPage'
 import {
   BacktestPage,
   HotPage,
   NewsPage,
-  SelectorPage,
   WatchPage,
 } from './pages/placeholders'
 
