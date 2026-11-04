@@ -12,6 +12,7 @@ import {
 } from 'antd'
 import { useEffect, useState } from 'react'
 import { configApi } from '../api/client'
+import DataSourcePanel from '../components/DataSourcePanel'
 
 /** 系统配置（T4.7 存储与性能 / T4.8 数据源接口 / T4.9 模型·账号·定时） */
 
@@ -129,6 +130,11 @@ export default function ConfigPage() {
               </Button>
             </Space>
           </Card>
+        </Col>
+
+        {/* 数据源接口配置（T4.8） */}
+        <Col xs={24}>
+          <DataSourcePanel />
         </Col>
       </Row>
     </div>

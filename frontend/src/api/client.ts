@@ -98,6 +98,60 @@ export const taskApi = {
   },
 }
 
+// ---------- 数据源接口配置（T3.5 / T4.8） ----------
+export interface SourceInterface {
+  id: number
+  data_type: string
+  name: string
+  impl_kind: string
+  impl_ref: string
+  params_template: Record<string, unknown>
+  role: string
+  priority: number
+  qps_limit: number
+  timeout_sec: number
+  enabled: boolean
+  last_ok_at: string | null
+  last_error: string
+}
+
+export interface SourcePayload {
+  data_type: string
+  name: string
+  impl_kind: string
+  impl_ref: string
+  params_template: Record<string, unknown>
+  role: string
+  priority: number
+  qps_limit: number
+  timeout_sec: number
+  enabled: boolean
+}
+
+export const datasourceApi = {
+  list: (dataType?: string) =>
+    request<{ items: SourceInterface[]; total: number }>(
+      `/api/datasource/interfaces${dataType ? `?data_type=${encodeURIComponent(dataType)}` : ''}`,
+    ),
+  create: (payload: SourcePayload) =>
+    request<SourceInterface>('/api/datasource/interfaces', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  update: (id: number, payload: Partial<SourcePayload>) =>
+    request<SourceInterface>(`/api/datasource/interfaces/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  remove: (id: number) =>
+    request<{ ok: boolean }>(`/api/datasource/interfaces/${id}`, { method: 'DELETE' }),
+  test: (id: number) =>
+    request<{ ok: boolean; count: number; duration_ms: number; error?: string }>(
+      `/api/datasource/interfaces/${id}/test`,
+      { method: 'POST' },
+    ),
+}
+
 export const healthApi = {
   check: () => request<{ status: string }>('/api/health'),
 }
