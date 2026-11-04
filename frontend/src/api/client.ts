@@ -86,6 +86,16 @@ export const taskApi = {
     request<{ items: TaskItem[]; total: number; page: number; page_size: number }>(
       `/api/task/status?page=1&page_size=${pageSize}`,
     ),
+  list: (params: { keyword?: string; status?: string; page?: number; pageSize?: number } = {}) => {
+    const q = new URLSearchParams()
+    if (params.keyword) q.set('keyword', params.keyword)
+    if (params.status) q.set('status', params.status)
+    q.set('page', String(params.page ?? 1))
+    q.set('page_size', String(params.pageSize ?? 10))
+    return request<{ items: TaskItem[]; total: number; page: number; page_size: number }>(
+      `/api/task/status?${q.toString()}`,
+    )
+  },
 }
 
 export const healthApi = {

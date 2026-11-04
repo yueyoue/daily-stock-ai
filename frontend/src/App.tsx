@@ -6,13 +6,13 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import MorningPage from './pages/MorningPage'
 import AfternoonPage from './pages/AfternoonPage'
+import TaskPage from './pages/TaskPage'
 import {
   BacktestPage,
   ConfigPage,
   HotPage,
   NewsPage,
   SelectorPage,
-  TaskPage,
   WatchPage,
 } from './pages/placeholders'
 

@@ -6,5 +6,4 @@ export const BacktestPage = () => <Placeholder title="策略回测" task="T5.7" 
 export const HotPage = () => <Placeholder title="热点题材库" task="T6.3/T6.6" />
 export const WatchPage = () => <Placeholder title="掘金观察池" task="T6.5" />
 export const NewsPage = () => <Placeholder title="资讯中心" task="T6.6" />
-export const TaskPage = () => <Placeholder title="任务监控" task="T4.6" />
 export const ConfigPage = () => <Placeholder title="系统配置" task="T4.7/T4.8/T4.9" />
