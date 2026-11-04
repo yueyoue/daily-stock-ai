@@ -18,6 +18,16 @@ def _clean(db):
     db.commit()
 
 
+def teardown_function():
+    """用例共享同一 DB：清理本模块写入的接口配置/日志，避免污染后续模块。"""
+    init_db()
+    db = SessionLocal()
+    try:
+        _clean(db)
+    finally:
+        db.close()
+
+
 def test_interfaces_crud_lifecycle(client):
     init_db()
     _login(client)

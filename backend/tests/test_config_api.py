@@ -22,6 +22,16 @@ def _clean(db):
     db.commit()
 
 
+def teardown_function():
+    """用例共享同一 DB：清理本模块写入的配置，避免污染后续模块（如指标模式用例）。"""
+    init_db()
+    db = SessionLocal()
+    try:
+        _clean(db)
+    finally:
+        db.close()
+
+
 def test_config_masks_llm_key_everywhere(client):
     init_db()
     _login(client)

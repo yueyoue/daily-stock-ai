@@ -13,6 +13,16 @@ def _clean(db):
     db.commit()
 
 
+def teardown_function():
+    """用例共享同一 DB：清理任务日志与配置覆盖，避免污染后续模块。"""
+    init_db()
+    db = SessionLocal()
+    try:
+        _clean(db)
+    finally:
+        db.close()
+
+
 def test_run_task_success_first_try():
     init_db()
     db = SessionLocal()
