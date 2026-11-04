@@ -4,12 +4,12 @@ import AppLayout from './components/AppLayout'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import MorningPage from './pages/MorningPage'
+import AfternoonPage from './pages/AfternoonPage'
 import {
-  AfternoonPage,
   BacktestPage,
   ConfigPage,
   HotPage,
-  MorningPage,
   NewsPage,
   SelectorPage,
   TaskPage,

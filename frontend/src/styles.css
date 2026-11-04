@@ -1,0 +1,47 @@
+/* Markdown 报告渲染样式（T4.4）：深色主题下的可读排版 */
+.md-body {
+  color: #cbd5e1;
+  line-height: 1.8;
+  font-size: 14px;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3 {
+  color: #f1f5f9;
+  margin: 16px 0 8px;
+}
+.md-body h1 { font-size: 20px; }
+.md-body h2 { font-size: 17px; }
+.md-body h3 { font-size: 15px; }
+.md-body p { margin: 8px 0; }
+.md-body ul, .md-body ol { padding-left: 22px; margin: 8px 0; }
+.md-body li { margin: 4px 0; }
+.md-body strong { color: #e2e8f0; }
+.md-body blockquote {
+  border-left: 3px solid #273757;
+  margin: 8px 0;
+  padding: 2px 12px;
+  color: #94a3b8;
+}
+.md-body table {
+  border-collapse: collapse;
+  margin: 10px 0;
+  width: 100%;
+}
+.md-body th,
+.md-body td {
+  border: 1px solid #273757;
+  padding: 6px 10px;
+  text-align: left;
+}
+.md-body th { background: #162138; color: #e2e8f0; }
+.md-body code {
+  background: #162138;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.md-body hr {
+  border: none;
+  border-top: 1px solid #273757;
+  margin: 14px 0;
+}
