@@ -34,6 +34,19 @@ def previous_trading_day(db: Session, day: date, max_back: int = 20) -> date:
     return day - timedelta(days=1)
 
 
+def next_trading_day(db: Session, day: date, max_forward: int = 20) -> date:
+    """下一个交易日（用于盘后复盘取「次日」行情做策略成功率验证）。"""
+    from datetime import timedelta
+
+    cur = day + timedelta(days=1)
+    for _ in range(max_forward):
+        if is_trading_day(db, cur):
+            return cur
+        cur = cur + timedelta(days=1)
+    logger.warning("前推 %d 天未找到交易日（基准 %s），按后一日返回", max_forward, day.isoformat())
+    return day + timedelta(days=1)
+
+
 def upsert_calendar(db: Session, entries: list[dict]) -> int:
     """批量写入日历。entries: [{"date": date|str, "is_trading_day": bool}, ...]"""
     count = 0
