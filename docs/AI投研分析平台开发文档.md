@@ -279,7 +279,8 @@
   3. **撮合规则**：涨停不买入、跌停不卖出；停牌日跳过；信号次日开盘价成交（T+1）
   4. **滑点**：默认单边 0.1% 可配置
 - **说明**：仅历史数据模拟，回测结果可视化展示，页面强制展示风险提示
-- **异步**：长周期回测放入任务队列，防止请求超时
+- **异步**：长周期回测放入任务队列，防止请求超时；`POST /api/backtest/run` 立即返回并投递后台队列，`GET /api/backtest/{id}` 返回状态（queued/running/success/failed）与运行进度 `progress={done,total,percent,updated_at}`（T5.8）
+- **对账自检**：`backend/scripts/reconcile_backtest.py` 抽样标的独立复算，逐笔成交价/手续费/涨跌停合规/T+1/FIFO 统计/逐日现金重放与引擎结果比对（T5.8）
 
 ### 模块 6：热点题材库 & 资讯过滤
 - 自动抓取每日热点，按产业链标签结构化归档
@@ -444,7 +445,7 @@
 | POST | /api/report/regenerate | 重新生成指定日期报告 |
 | POST | /api/selector/scan | 执行选股扫描 |
 | POST | /api/backtest/run | 提交回测任务 |
-| GET | /api/backtest/{id} | 获取回测结果 |
+| GET | /api/backtest/{id} | 获取回测状态/进度/结果（含 progress 进度字段） |
 | GET | /api/hot_topic/list | 热点列表（板块/关键词/日期检索） |
 | GET | /api/news/list | 资讯列表（板块/关键词/日期/影响等级/来源过滤） |
 | GET | /api/watchlist/list | 观察池列表 |
