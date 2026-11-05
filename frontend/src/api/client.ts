@@ -293,6 +293,88 @@ export const backtestApi = {
   get: (id: number) => request<BacktestRecord>(`/api/backtest/${id}`),
 }
 
+// ---------- 热点题材库（T3.4 / T6.3 归档 / T6.6 页面） ----------
+export interface HotTopicItem {
+  id: number
+  date: string
+  title: string
+  heat: string // 高/中/低
+  industry_chain: string
+  related_codes: string[]
+}
+
+export const hotApi = {
+  list: (
+    params: { keyword?: string; heat?: string; date?: string; page?: number; pageSize?: number } = {},
+  ) => {
+    const q = new URLSearchParams()
+    if (params.keyword) q.set('keyword', params.keyword)
+    if (params.heat) q.set('heat', params.heat)
+    if (params.date) q.set('date', params.date)
+    q.set('page', String(params.page ?? 1))
+    q.set('page_size', String(params.pageSize ?? 30))
+    return request<{ items: HotTopicItem[]; total: number; page: number; page_size: number }>(
+      `/api/hot_topic/list?${q.toString()}`,
+    )
+  },
+}
+
+// ---------- 资讯中心（T3.4 列表 / T6.2 降噪分级 / T6.6 页面） ----------
+export interface NewsItem {
+  id: number
+  published_at: string | null
+  title: string
+  content: string
+  source: string
+  impact_level: string // 高/中/低/无关/未分级(空串)
+  url: string
+}
+
+export interface ClassifyStats {
+  pending: number
+  batches: number
+  failed_batches: number
+  classified: Record<string, number>
+  irrelevant: number
+  unclassified: number
+  last_error: string
+  ok: boolean
+}
+
+export const newsApi = {
+  list: (
+    params: {
+      keyword?: string
+      impactLevel?: string
+      source?: string
+      from?: string
+      to?: string
+      onlyRelevant?: boolean
+      page?: number
+      pageSize?: number
+    } = {},
+  ) => {
+    const q = new URLSearchParams()
+    if (params.keyword) q.set('keyword', params.keyword)
+    if (params.impactLevel) q.set('impact_level', params.impactLevel)
+    if (params.source) q.set('source', params.source)
+    if (params.from) q.set('from', params.from)
+    if (params.to) q.set('to', params.to)
+    if (params.onlyRelevant === false) q.set('only_relevant', 'false')
+    q.set('page', String(params.page ?? 1))
+    q.set('page_size', String(params.pageSize ?? 20))
+    return request<{ items: NewsItem[]; total: number; page: number; page_size: number }>(
+      `/api/news/list?${q.toString()}`,
+    )
+  },
+  /** T6.2：对未分级资讯执行 LLM 降噪分级（失败兜底：保持未分级、不丢数据） */
+  classify: (limit = 50, batchSize = 20) =>
+    request<ClassifyStats>(
+      `/api/news/classify?limit=${limit}&batch_size=${batchSize}`,
+      { method: 'POST' },
+    ),
+}
+
 export const healthApi = {
   check: () => request<{ status: string }>('/api/health'),
 }

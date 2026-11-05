@@ -10,10 +10,8 @@ import TaskPage from './pages/TaskPage'
 import ConfigPage from './pages/ConfigPage'
 import SelectorPage from './pages/SelectorPage'
 import BacktestPage from './pages/BacktestPage'
-import {
-  HotPage,
-  NewsPage,
-} from './pages/placeholders'
+import HotPage from './pages/HotPage'
+import NewsPage from './pages/NewsPage'
 import WatchPage from './pages/WatchPage'
 
 // 深色主题对齐原型（docs/AI投研工作台.html：#0b1120/#162138/#273757/#2563eb）
