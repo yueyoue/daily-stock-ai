@@ -1,4 +1,9 @@
-"""报告接口（T3.2，开发文档 §7 /api/report/*；LLM 生成 T7.4 接入）。"""
+"""报告接口（T3.2 查询 + T7.4 LLM 生成流水线，开发文档 §7 /api/report/*）。
+
+- list / detail：历史报告查询
+- regenerate：数据 → LLM → Markdown → 校验重试 → 入库（覆盖 + version+1）；
+  响应带 ok/attempts/fallback/problems，便于前端提示生成质量与降级状态
+"""
 from datetime import date
 
 from fastapi import APIRouter, Depends, Query
@@ -9,7 +14,7 @@ from app.core.errors import AppError
 from app.models.base import get_db
 from app.schemas.common import Pagination
 from app.api.deps import get_pagination
-from app.services.report import REPORT_TYPES, get_report, list_reports, regenerate_report
+from app.services.report import REPORT_TYPES, generate_and_store, get_report, list_reports
 
 router = APIRouter(prefix="/api/report", tags=["report"])
 
@@ -45,6 +50,11 @@ class RegenerateResponse(BaseModel):
     report_date: str
     version: int
     generated_at: str | None = None
+    ok: bool = True
+    attempts: int = 0
+    fallback: bool = False
+    llm_used: bool = False
+    problems: list[str] = []
 
 
 @router.get("/list", response_model=ReportPage)
@@ -73,9 +83,13 @@ def report_detail(report_id: int, db: Session = Depends(get_db)):
 
 @router.post("/regenerate", response_model=RegenerateResponse)
 def report_regenerate(payload: RegenerateRequest, db: Session = Depends(get_db)):
-    row = regenerate_report(db, payload.type, payload.report_date)
+    """重新生成指定日期报告（覆盖旧记录 version+1）。"""
+    res = generate_and_store(db, payload.type, payload.report_date)
+    row = res["report"]
     return {
         "id": row.id, "type": row.type, "report_date": row.report_date.isoformat(),
         "version": row.version,
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
+        "ok": res["ok"], "attempts": res["attempts"], "fallback": res["fallback"],
+        "llm_used": res["llm_used"], "problems": res["problems"],
     }
