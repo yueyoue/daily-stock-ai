@@ -15,9 +15,10 @@ services:
       - "8000:8000"            # 唯一对外端口（后端托管前端静态文件）；宝塔反代时可改为 127.0.0.1:8000:8000
     environment:
       TZ: Asia/Shanghai        # 关键：定时报告（08:00/17:00）依赖
-      SECRET_KEY: ${SECRET_KEY:-dev-c…ge}
+      SECRET_KEY: ${SECRET_KEY:-dev-change-me}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_INITIAL_PASSWORD: ${ADMIN_INITIAL_PASSWORD:-}   # 留空则启动日志打印随机初始密码
+      API_DOCS_ENABLED: ${API_DOCS_ENABLED:-true}   # 生产建议 false：接口文档随白名单一并关（T8.5）
       DATABASE_URL: mysql+pymysql://dsa:${DB_PASSWORD}@mysql:3306/daily_stock_ai?charset=utf8mb4
       REDIS_URL: redis://redis:6379/0        # 未启用 redis profile 时忽略
       LLM_API_KEY: ${LLM_API_KEY}

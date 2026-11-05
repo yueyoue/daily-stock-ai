@@ -68,12 +68,13 @@ app = FastAPI(
     version="0.1.0",
     description=(
         "DailyStockAI API（开发文档 §7 契约）。约定："
-        "① 鉴权覆盖全部 /api/*（白名单仅 health/login/docs）；"
+        "① 鉴权覆盖全部 /api/*（免鉴权仅 health/login；接口文档 docs/openapi "
+        "仅当 API_DOCS_ENABLED=true 时放行，生产建议关闭）；"
         "② 统一错误格式 {\"code\": int, \"message\": str}，错误码表见 core/errors.ERROR_CODES；"
         "③ 列表接口统一分页参数 page/page_size，响应 {items,total,page,page_size}。"
     ),
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json",
+    docs_url="/api/docs" if settings.api_docs_enabled else None,
+    openapi_url="/api/openapi.json" if settings.api_docs_enabled else None,
     lifespan=lifespan,
 )
 
@@ -105,10 +106,12 @@ app.include_router(config_router, dependencies=[Depends(require_user)])
 app.include_router(datasource_router, dependencies=[Depends(require_user)])
 
 
-@app.get("/docs", include_in_schema=False)
-async def docs_alias():
-    """开发文档约定 /docs 可浏览（重定向到 /api/docs）。"""
-    return RedirectResponse("/api/docs")
+if settings.api_docs_enabled:
+
+    @app.get("/docs", include_in_schema=False)
+    async def docs_alias():
+        """开发文档约定 /docs 可浏览（重定向到 /api/docs）；随 API_DOCS_ENABLED 一并关闭。"""
+        return RedirectResponse("/api/docs")
 
 # ---- 前端静态托管（镜像内 frontend/dist 存在时，开发文档 §8.1 单镜像交付）----
 _DIST = Path(settings.frontend_dist)

@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_initial_password: str = ""  # 留空则首次启动生成随机密码并打印到日志
 
+    # 接口文档（Swagger/OpenAPI）开放开关（T8.5 安全自查，开发文档 §8.4）：
+    # 默认 True 便于开发调试（T3.1 验收"OpenAPI 可浏览"依赖）；
+    # 生产环境建议置 false —— 免鉴权白名单收敛为仅 /api/health + /api/auth/login，
+    # /api/docs 与 /api/openapi.json 未登录访问即 401（不再对外暴露接口清单）
+    api_docs_enabled: bool = True
+
     # LLM（开发文档 §5.4：仅环境变量，前端只显示尾号）
     llm_api_key: str = ""
     llm_model: str = "qwen-plus"

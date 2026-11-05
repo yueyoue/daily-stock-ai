@@ -1,0 +1,17 @@
+# 构建上下文瘦身 + 防敏感文件进入镜像层（T8.5 安全自查，开发文档 §8.4）
+# 关键：.env / .git 绝不能进构建上下文（更不会进镜像层）；node_modules 由镜像内 npm install 生成
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+*.tar.gz
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.db
+node_modules/
+frontend/dist/
+docs/

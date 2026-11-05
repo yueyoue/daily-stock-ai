@@ -19,8 +19,18 @@ from app.models.base import get_db
 
 COOKIE_NAME = "dsa_token"
 
-# 鉴权白名单（开发文档 §3.4：仅 health / login；docs 为开发调试便利放行）
-_WHITELIST = {"/api/health", "/api/auth/login", "/api/docs", "/api/openapi.json"}
+# 鉴权白名单（开发文档 §3.4：仅 health / login）
+_WHITELIST_BASE = {"/api/health", "/api/auth/login"}
+# 接口文档白名单（T3.1 "OpenAPI 可浏览"）：仅 api_docs_enabled=True 时放行；
+# 生产建议置 false（T8.5 安全自查），白名单收敛为仅 health/login，不再暴露接口清单
+_WHITELIST_DOCS = {"/api/docs", "/api/openapi.json"}
+
+
+def _whitelist() -> set[str]:
+    """当前生效的免鉴权路径集合（随 API_DOCS_ENABLED 配置切换）。"""
+    if get_settings().api_docs_enabled:
+        return _WHITELIST_BASE | _WHITELIST_DOCS
+    return set(_WHITELIST_BASE)
 
 
 # ---------- 密码 ----------
@@ -104,7 +114,7 @@ def install_auth_middleware(app: FastAPI) -> None:
         path = request.url.path
         if (
             path.startswith("/api/")
-            and path not in _WHITELIST
+            and path not in _whitelist()
             and request.method != "OPTIONS"
         ):
             token = get_token_from_request(request)
