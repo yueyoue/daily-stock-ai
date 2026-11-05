@@ -8,6 +8,7 @@ from app.api.deps import get_pagination
 from app.models.base import get_db
 from app.models.content import WatchList
 from app.schemas.common import Pagination
+from app.services.watchlist import preview_for_codes
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
 
@@ -18,6 +19,14 @@ class WatchItem(BaseModel):
     name: str
     dimension: str
     created_at: str | None = None
+    # 快照预览（T6.5，additive 字段）
+    latest_date: str | None = None
+    close: float | None = None
+    pct_change: float | None = None
+    roe: float | None = None
+    industry: str | None = None
+    concepts: list[str] | None = None
+    market_cap: float | None = None  # 待快照线扩展
 
 
 class WatchPage(BaseModel):
@@ -33,9 +42,12 @@ class WatchAddRequest(BaseModel):
     dimension: str = ""
 
 
-def _row(r: WatchList) -> dict:
-    return {"id": r.id, "code": r.code, "name": r.name, "dimension": r.dimension,
+def _row(r: WatchList, preview: dict | None = None) -> dict:
+    data = {"id": r.id, "code": r.code, "name": r.name, "dimension": r.dimension,
             "created_at": r.created_at.isoformat() if r.created_at else None}
+    if preview:
+        data.update(preview)
+    return data
 
 
 @router.get("/list", response_model=WatchPage)
@@ -50,7 +62,8 @@ def watchlist_list(
     total = q.count()
     rows = (q.order_by(WatchList.id.desc())
             .offset(page.offset).limit(page.limit).all())
-    return {"items": [_row(r) for r in rows], "total": total,
+    preview = preview_for_codes(db, [r.code for r in rows])
+    return {"items": [_row(r, preview.get(r.code)) for r in rows], "total": total,
             "page": page.page, "page_size": page.page_size}
 
 

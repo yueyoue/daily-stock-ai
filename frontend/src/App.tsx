@@ -13,8 +13,8 @@ import {
   BacktestPage,
   HotPage,
   NewsPage,
-  WatchPage,
 } from './pages/placeholders'
+import WatchPage from './pages/WatchPage'
 
 // 深色主题对齐原型（docs/AI投研工作台.html：#0b1120/#162138/#273757/#2563eb）
 export default function App() {

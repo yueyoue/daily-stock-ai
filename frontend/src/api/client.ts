@@ -228,14 +228,28 @@ export interface WatchItem {
   name: string
   dimension: string
   created_at: string | null
+  // 快照预览（T6.5）
+  latest_date?: string | null
+  close?: number | null
+  pct_change?: number | null
+  roe?: number | null
+  industry?: string | null
+  concepts?: string[] | null
+  market_cap?: number | null
 }
 
 export const watchlistApi = {
+  list: (dimension?: string) =>
+    request<{ items: WatchItem[]; total: number; page: number; page_size: number }>(
+      `/api/watchlist/list?page=1&page_size=100${dimension ? `&dimension=${encodeURIComponent(dimension)}` : ''}`,
+    ),
   add: (code: string, name: string, dimension = '') =>
     request<WatchItem>('/api/watchlist/add', {
       method: 'POST',
       body: JSON.stringify({ code, name, dimension }),
     }),
+  remove: (id: number) =>
+    request<{ ok: boolean }>(`/api/watchlist/${id}`, { method: 'DELETE' }),
 }
 
 export const healthApi = {
