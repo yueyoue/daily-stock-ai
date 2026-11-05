@@ -8,7 +8,7 @@ import hashlib
 import re
 from datetime import datetime
 
-from collectors.base import BaseCollector
+from app.collectors.base import BaseCollector
 
 # 中文/异名列名 → 标准字段
 COLUMN_MAP = {

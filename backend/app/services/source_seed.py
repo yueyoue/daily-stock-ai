@@ -164,6 +164,41 @@ INITIAL_SOURCES: list[dict] = [
         "qps_limit": 1.0,
         "timeout_sec": 60,
     },
+    # T6.1 资讯采集线（QPS≤0.5，§2.3.3 限流）
+    {
+        "data_type": "news",
+        "name": "akshare-财联社电报",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.news:ClsNewsCollector",
+        "params_template": {},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 0.5,
+        "timeout_sec": 60,
+    },
+    {
+        "data_type": "news",
+        "name": "akshare-同花顺快讯（备用）",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.news:ThsNewsCollector",
+        "params_template": {},
+        "role": "备用",
+        "priority": 2,
+        "qps_limit": 0.5,
+        "timeout_sec": 60,
+    },
+    # T6.3 热点题材库
+    {
+        "data_type": "hot_topic",
+        "name": "akshare-东财概念板块",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.hot:AkshareConceptCollector",
+        "params_template": {"top_n": 50},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 0.5,
+        "timeout_sec": 600,
+    },
 ]
 
 

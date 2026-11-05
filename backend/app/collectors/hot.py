@@ -8,7 +8,7 @@
 """
 from datetime import date as date_type
 
-from collectors.base import BaseCollector
+from app.collectors.base import BaseCollector
 
 COLUMN_MAP = {
     "概念名": "title", "名称": "title", "板块名称": "title",
