@@ -9,8 +9,8 @@ import AfternoonPage from './pages/AfternoonPage'
 import TaskPage from './pages/TaskPage'
 import ConfigPage from './pages/ConfigPage'
 import SelectorPage from './pages/SelectorPage'
+import BacktestPage from './pages/BacktestPage'
 import {
-  BacktestPage,
   HotPage,
   NewsPage,
 } from './pages/placeholders'

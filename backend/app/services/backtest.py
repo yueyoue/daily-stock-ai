@@ -75,10 +75,13 @@ def _engine(row: BacktestRecord) -> dict:
         )
         out = simulate(data, candidate_fn, row.start_date, row.end_date,
                        row.initial_capital, rules)
+        from app.services.backtest_stats import compute_stats
+        stats = compute_stats(out["trades"], out["equity_curve"], row.initial_capital)
         return {
             "engine": "t5.6",
             "equity_curve": out["equity_curve"],
             "trades": out["trades"],
+            "trade_details": stats["trade_details"],
             "events": out["events"],
             "final_equity": out["final_equity"],
             "open_orders": out["open_orders"],
@@ -86,7 +89,11 @@ def _engine(row: BacktestRecord) -> dict:
             "rules": {"slippage": rules.slippage, "fee_rate": rules.fee_rate,
                       "limit_pct": rules.limit_pct,
                       "max_positions": rules.max_positions},
-            "win_rate": None, "profit_loss_ratio": None, "max_drawdown": None,
+            "win_rate": stats["win_rate"],
+            "profit_loss_ratio": stats["profit_loss_ratio"],
+            "max_drawdown": stats["max_drawdown"],
+            "cumulative_return": stats["cumulative_return"],
+            "closed_trades": stats["closed_trades"],
             "risk_notice": "回测基于历史数据模拟，不代表未来收益",
         }
     finally:

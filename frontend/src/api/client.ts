@@ -252,6 +252,38 @@ export const watchlistApi = {
     request<{ ok: boolean }>(`/api/watchlist/${id}`, { method: 'DELETE' }),
 }
 
+// ---------- 回测（T5.6 撮合 / T5.7 统计可视化） ----------
+export interface BacktestRunPayload {
+  start_date: string
+  end_date: string
+  initial_capital: number
+  strategy_id?: number | null
+  fee_rate: number
+  slippage: number
+  limit_pct?: number
+  max_positions?: number
+}
+
+export interface BacktestRecord {
+  id: number
+  status: string // queued / running / success / failed
+  strategy_id: number | null
+  start_date: string | null
+  end_date: string | null
+  initial_capital: number
+  result: Record<string, any>
+  created_at: string | null
+}
+
+export const backtestApi = {
+  run: (payload: BacktestRunPayload) =>
+    request<BacktestRecord>('/api/backtest/run', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  get: (id: number) => request<BacktestRecord>(`/api/backtest/${id}`),
+}
+
 export const healthApi = {
   check: () => request<{ status: string }>('/api/health'),
 }
