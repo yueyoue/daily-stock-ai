@@ -70,21 +70,21 @@ def test_registry_wires_all_jobs_from_config():
         assert specs["report_morning"]["func_ref"] == "app.services.report:job_generate_morning"
         assert specs["report_morning"]["enabled"] is True
         assert specs["report_morning"]["trading_only"] is True
-        assert specs["report_morning"]["cron"] == "0 8 * * 1-5"
+        assert specs["report_morning"]["cron"] == "0 8 * * mon-fri"
 
-        assert specs["report_afternoon"]["cron"] == "0 17 * * 1-5"
+        assert specs["report_afternoon"]["cron"] == "0 17 * * mon-fri"
         assert specs["report_afternoon"]["trading_only"] is True
 
         # 资讯线：每日 07:30 且不受交易日限制；收盘采集：交易日 15:30
         assert specs["collect_overnight"]["cron"] == "30 7 * * *"
         assert specs["collect_overnight"]["trading_only"] is False
-        assert specs["collect_close"]["cron"] == "30 15 * * 1-5"
-        assert specs["build_indicator_cache"]["cron"] == "0 16 * * 1-5"
+        assert specs["collect_close"]["cron"] == "30 15 * * mon-fri"
+        assert specs["build_indicator_cache"]["cron"] == "0 16 * * mon-fri"
 
         # 配置页改时间/开关 → 注册表解析即时生效
-        save_config(db, report_am_cron="30 7 * * 1-5", report_am_enabled=False)
+        save_config(db, report_am_cron="30 7 * * mon-fri", report_am_enabled=False)
         specs2 = {s["name"]: s for s in get_job_specs(db)}
-        assert specs2["report_morning"]["cron"] == "30 7 * * 1-5"
+        assert specs2["report_morning"]["cron"] == "30 7 * * mon-fri"
         assert specs2["report_morning"]["enabled"] is False
     finally:
         db.close()

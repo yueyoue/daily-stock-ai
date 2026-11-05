@@ -205,8 +205,11 @@ def generate_and_store(
         .first()
     )
     if row is None:
+        # 首建也显式写生成时间：与覆盖分支同口径（本地时间），避免依赖 server_default
+        # （MySQL now() 随会话时区、SQLite CURRENT_TIMESTAMP 为 UTC，会产生不一致时间戳）
         row = Report(type=report_type, report_date=report_date,
-                     title=title, md_content=md, version=1)
+                     title=title, md_content=md, version=1,
+                     generated_at=datetime.now())
         db.add(row)
     else:  # 覆盖旧记录并留版本痕迹（T7.4 验收口径）
         row.title = title

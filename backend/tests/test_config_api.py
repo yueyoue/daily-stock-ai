@@ -63,14 +63,14 @@ def test_config_save_values_and_validation(client):
         "tech_indicator_store": True,
         "indicator_cache_days": 5,
         "indicator_engine": "pandas",
-        "report_am_cron": "30 7 * * 1-5",
+        "report_am_cron": "30 7 * * mon-fri",
     })
     assert r.status_code == 200
     data = r.json()
     assert data["tech_indicator_store"] is True
     assert data["indicator_cache_days"] == 5
     assert data["indicator_engine"] == "pandas"
-    assert data["report_am_cron"] == "30 7 * * 1-5"
+    assert data["report_am_cron"] == "30 7 * * mon-fri"
 
     # 范围 / 枚举 / 非法 cron → 400 统一错误格式
     for bad in ({"indicator_cache_days": 0},

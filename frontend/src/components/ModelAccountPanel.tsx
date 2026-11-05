@@ -2,7 +2,8 @@ import { Button, Card, Divider, Input, Space, Switch, Typography, message } from
 import { useEffect, useState } from 'react'
 import { authApi, configApi } from '../api/client'
 
-/** 模型 / 账号 / 定时任务（T4.9 + T7.5）：LLM 切换+Key 遮蔽+连通测试、修改密码、报告与采集定时/开关 */
+/** 模型 / 账号 / 定时任务（T4.9 + T7.5 + T7.6）：
+ *  LLM 切换+Key 遮蔽+连通测试、修改密码、报告与采集定时/开关、失败告警 webhook */
 
 function ToggleRow({
   label,
@@ -39,6 +40,9 @@ export default function ModelAccountPanel() {
   const [collectAmOn, setCollectAmOn] = useState(true)
   const [collectPmOn, setCollectPmOn] = useState(true)
 
+  // 失败告警 webhook（T7.6）：空串 = 只在日志与任务日志留痕
+  const [alertWebhook, setAlertWebhook] = useState('')
+
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
 
@@ -59,6 +63,7 @@ export default function ModelAccountPanel() {
       setReportPmOn(c.report_pm_enabled)
       setCollectAmOn(c.collect_am_enabled)
       setCollectPmOn(c.collect_pm_enabled)
+      setAlertWebhook(c.alert_webhook ?? '')
       setKeyMasked(c.llm_api_key_masked)
       setLlmKey('') // 保存后清空输入框，永不回显明文
     } catch (e) {
@@ -83,10 +88,11 @@ export default function ModelAccountPanel() {
         report_pm_enabled: reportPmOn,
         collect_am_enabled: collectAmOn,
         collect_pm_enabled: collectPmOn,
+        alert_webhook: alertWebhook.trim(),
       }
       if (llmKey.trim()) payload.llm_api_key = llmKey.trim() // 空=不修改
       await configApi.save(payload)
-      message.success('已保存（开关立即生效，cron 时间下次启动调度器时生效）')
+      message.success('已保存（开关与告警地址立即生效，cron 时间下次启动调度器时生效）')
       await reload()
     } catch (e) {
       message.error(e instanceof Error ? e.message : '保存失败')
@@ -184,6 +190,23 @@ export default function ModelAccountPanel() {
           cron 格式：分 时 日 月 周（默认 0 8 * * 1-5 = 交易日早 8 点）；交易日判断由调度器按交易日历前置过滤，
           非交易日不生成报告（只跑资讯线）。时区固定 Asia/Shanghai。
         </Typography.Paragraph>
+
+        <Divider style={{ margin: '8px 0' }} />
+
+        {/* 失败告警（T7.6，开发文档 §1.4） */}
+        <div>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>失败告警 Webhook（可选）</div>
+          <Input
+            value={alertWebhook}
+            onChange={(e) => setAlertWebhook(e.target.value)}
+            placeholder="留空 = 只写日志与任务日志；填 URL 则失败时 POST JSON"
+          />
+          <div style={{ fontSize: 12, opacity: 0.65, marginTop: 4 }}>
+            任务重试 3 次仍失败才触发：先写 ALERT 日志与任务日志（状态 warning），再向该地址 POST JSON
+            （3 秒超时、best-effort，告警通道不通不影响任务本身）。
+          </div>
+        </div>
+
         <Button type="primary" loading={saving} onClick={() => void save()}>
           保存模型与定时配置
         </Button>

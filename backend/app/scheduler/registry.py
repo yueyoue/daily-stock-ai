@@ -9,6 +9,11 @@
 - run_job：注册表任务统一入口（交易日判断 + 统一执行器 run_task：重试/告警/日志）
 - build_scheduler：按注册表装配调度器（TZ=Asia/Shanghai），起停由 app.main lifespan 管理
 - tz_selfcheck：启动自检 TZ 是否 Asia/Shanghai（§4.9 / §8 硬约束）
+
+⚠️ 星期段写法（T7.6 定时核对修正）：APScheduler 3.x 的 day_of_week 以 0=周一，
+与 crontab 的 0=周日不一致（官方 issue 286，v4 才修正）。因此周期性的"工作日"
+必须写 `mon-fri`（或 0-4），**不可写 1-5**——在 3.x 下 `1-5` 表示周二~周六，
+会导致周一不触发、周六空跑（周六被交易日前置判断跳过，周一则被漏掉）。
 """
 from __future__ import annotations
 
@@ -64,7 +69,7 @@ JOB_REGISTRY: list[dict] = [
     dict(
         name="build_indicator_cache",
         func_ref="app.scheduler.indicator_jobs:job_build_indicator_cache",
-        cron="0 16 * * 1-5",
+        cron="0 16 * * mon-fri",
         source="fixed",
         enabled=True,
         trading_only=True,

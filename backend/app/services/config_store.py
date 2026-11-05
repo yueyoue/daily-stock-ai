@@ -11,24 +11,29 @@ from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.config import SystemConfig
 
-_CRON_RE = re.compile(r"^[\d\*\,\-\ /]+$")
+# 允许星号/数字/逗号/连字符/斜杠/空格，以及星期英文名（mon-fri）。
+# 星期段必须用 mon-fri 这类名称：APScheduler 3.x 的 0=周一（非 crontab 的 0=周日），
+# 数字 "1-5" 会被解读为周二~周六，导致周一不触发（T7.6 定时核对发现）。
+_CRON_RE = re.compile(r"^[\dA-Za-z\*\,\-\ /]+$")
 
 # 配置项规格（类型 / 默认值 / 约束）；默认值会被同名 Settings 环境变量覆盖
 CONFIG_SPEC: dict[str, dict] = {
     "tech_indicator_store": {"type": bool, "default": False},
     "indicator_cache_days": {"type": int, "default": 3, "min": 1, "max": 30},
     "indicator_engine": {"type": str, "default": "talib", "choices": ["talib", "pandas"]},
-    "report_am_cron": {"type": str, "default": "0 8 * * 1-5", "cron": True},
-    "report_pm_cron": {"type": str, "default": "0 17 * * 1-5", "cron": True},
+    "report_am_cron": {"type": str, "default": "0 8 * * mon-fri", "cron": True},
+    "report_pm_cron": {"type": str, "default": "0 17 * * mon-fri", "cron": True},
     # T7.5 定时调度：采集线时间与四类任务开关（交易日前置判断在调度层 registry.run_job）
     "collect_am_cron": {"type": str, "default": "30 7 * * *", "cron": True},
-    "collect_pm_cron": {"type": str, "default": "30 15 * * 1-5", "cron": True},
+    "collect_pm_cron": {"type": str, "default": "30 15 * * mon-fri", "cron": True},
     "collect_am_enabled": {"type": bool, "default": True},
     "collect_pm_enabled": {"type": bool, "default": True},
     "report_am_enabled": {"type": bool, "default": True},
     "report_pm_enabled": {"type": bool, "default": True},
     "llm_model": {"type": str, "default": "qwen-plus"},
     "llm_api_key": {"type": str, "default": "", "secret": True},
+    # T7.6 失败告警（开发文档 §1.4）：留空 = 失败只落日志与 task_log；填 URL = 重试用尽后 POST JSON
+    "alert_webhook": {"type": str, "default": ""},
 }
 
 

@@ -27,6 +27,8 @@ class ConfigUpdate(BaseModel):
     report_pm_enabled: bool | None = None
     llm_model: str | None = None
     llm_api_key: str | None = None
+    # T7.6 失败告警 webhook（空串 = 关闭，改后下次任务失败即生效）
+    alert_webhook: str | None = None
 
 
 @router.get("/get")

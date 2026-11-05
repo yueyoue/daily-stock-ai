@@ -104,13 +104,13 @@ def test_job_specs_resolve_cron_from_config():
     try:
         _clean(db)
         specs = {s["name"]: s for s in get_job_specs(db)}
-        assert specs["build_indicator_cache"]["cron"] == "0 16 * * 1-5"
+        assert specs["build_indicator_cache"]["cron"] == "0 16 * * mon-fri"
         assert specs["report_morning"]["enabled"] is True    # T7.5 已接线（开关走配置）
-        assert specs["report_morning"]["cron"] == "0 8 * * 1-5"
+        assert specs["report_morning"]["cron"] == "0 8 * * mon-fri"
 
         # 配置页改 cron → 注册表解析立即生效
-        save_config(db, report_am_cron="30 7 * * 1-5")
+        save_config(db, report_am_cron="30 7 * * mon-fri")
         specs2 = {s["name"]: s for s in get_job_specs(db)}
-        assert specs2["report_morning"]["cron"] == "30 7 * * 1-5"
+        assert specs2["report_morning"]["cron"] == "30 7 * * mon-fri"
     finally:
         db.close()

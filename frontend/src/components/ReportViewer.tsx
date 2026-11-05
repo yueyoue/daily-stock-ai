@@ -63,15 +63,30 @@ export default function ReportViewer({
     loadList()
   }, [loadList])
 
-  const regenerate = async () => {
+const regenerate = async () => {
     const reportDate = selected?.report_date ?? new Date().toISOString().slice(0, 10)
     setRegenerating(true)
     try {
-      const r = await request<{ id: number; version: number }>('/api/report/regenerate', {
+      const r = await request<{
+        id: number
+        version: number
+        ok: boolean
+        attempts: number
+        fallback: boolean
+        llm_used: boolean
+        problems: string[]
+      }>('/api/report/regenerate', {
         method: 'POST',
         body: JSON.stringify({ type, report_date: reportDate }),
       })
-      message.success(`已重新生成（v${r.version}）`)
+      // T7.6：把生成质量如实反馈给用户（降级骨架 / 校验问题 / LLM 尝试次数）
+      if (r.fallback) {
+        message.warning('已生成结构化骨架（LLM 未就绪，配置 Key 后可重新生成）')
+      } else if (r.problems && r.problems.length > 0) {
+        message.warning(`已生成，但存在待人工复核项：${r.problems.join('；')}`)
+      } else {
+        message.success(`已重新生成（v${r.version}，尝试 ${r.attempts} 次）`)
+      }
       await loadList()
       await openReport(r.id)
     } catch (e) {
@@ -131,13 +146,13 @@ export default function ReportViewer({
                 }}
               />
             )}
-            <Button
+<Button
               block
               style={{ marginTop: 12, borderColor: '#2563eb', color: '#2563eb' }}
               loading={regenerating}
               onClick={regenerate}
             >
-              重新生成当日报告
+              {items.length === 0 || !selected ? '生成当日报告' : '重新生成当日报告'}
             </Button>
           </Card>
         </Col>
@@ -156,13 +171,18 @@ export default function ReportViewer({
               </Space>
             }
           >
-            {selected ? (
+{selected ? (
               <div className="md-body">
+                {/* T7.6：展示生成时间与版本，便于核对定时任务产出 */}
+                <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>
+                  版本 v{selected.version}
+                  {selected.generated_at ? ` · 生成时间 ${selected.generated_at.replace('T', ' ').slice(0, 19)}` : ''}
+                </Typography.Paragraph>
                 <ReactMarkdown>{selected.md_content}</ReactMarkdown>
               </div>
             ) : (
               <Empty
-                description="暂无报告内容，可点左侧「重新生成当日报告」"
+                description="暂无报告内容，可点左侧「生成当日报告」"
                 style={{ padding: '80px 0' }}
               />
             )}

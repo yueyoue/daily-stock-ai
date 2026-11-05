@@ -66,8 +66,10 @@ report_am_cron: string
   collect_pm_enabled: boolean
   report_am_enabled: boolean
   report_pm_enabled: boolean
-  llm_model: string
+llm_model: string
   llm_api_key_masked: string
+  /** T7.6 失败告警 webhook（空串 = 关闭） */
+  alert_webhook: string
 }
 
 export const configApi = {
