@@ -41,6 +41,7 @@
 - 不接入实盘、不自动下单（硬约束）
 - 数据采集、回测等重任务后台异步执行，不阻塞前端
 - 任务失败自动重试、全链路日志留存
+- **失败告警（T7.6 落地口径）**：任务经统一执行器 `run_task` 最多尝试 3 次（指数退避 1s/2s），仍失败则触发 `alert(task_name, message)` —— ① `error` 级 ALERT 日志；② `task_log` 留 `warning` 行（任务名 `告警:<task_name>`）；③ 若配置了 `ALERT_WEBHOOK`（配置页覆盖 > `.env` > 默认空），向该地址 `POST` JSON（`{source, level:"error", task, message, timestamp}`，3 秒超时、best-effort）。**未配置 webhook 时仅落 ①②**；告警通道故障绝不影响任务本体与日志留痕；webhook 地址由系统配置页「失败告警 Webhook（可选）」维护。
 - 数据本地持久化，减少对数据源的重复请求
 - 登录鉴权覆盖全部 API；全站 HTTPS（生产环境）；定时任务统一使用 Asia/Shanghai 时区
 
@@ -353,15 +354,21 @@
 > **T7.5 落地口径**（实现 `backend/app/scheduler/registry.py`、`backend/app/scheduler/collect_jobs.py`）：
 > - **声明式注册表** `JOB_REGISTRY`（顺序即时间线；每项含名称、cron 来源、启用开关来源、任务函数引用 `func_ref`、是否仅交易日 `trading_only`）：
 >   `collect_overnight`（`COLLECT_AM_CRON`，默认 `30 7 * * *`，每日，含非交易日）→
->   `report_morning`（`REPORT_AM_CRON`，默认 `0 8 * * 1-5`，仅交易日）→
->   `collect_close`（`COLLECT_PM_CRON`，默认 `30 15 * * 1-5`，仅交易日）→
->   `build_indicator_cache`（固定 `0 16 * * 1-5`，仅交易日）→
->   `report_afternoon`（`REPORT_PM_CRON`，默认 `0 17 * * 1-5`，仅交易日）。
+>   `report_morning`（`REPORT_AM_CRON`，默认 `0 8 * * mon-fri`，仅交易日）→
+>   `collect_close`（`COLLECT_PM_CRON`，默认 `30 15 * * mon-fri`，仅交易日）→
+>   `build_indicator_cache`（固定 `0 16 * * mon-fri`，仅交易日）→
+>   `report_afternoon`（`REPORT_PM_CRON`，默认 `0 17 * * mon-fri`，仅交易日）。
+>   ⚠️ **星期段必须写 `mon-fri`**：APScheduler 3.x 的 `day_of_week` 以 **0=周一**（crontab 惯例是 0=周日），数字 `1-5` 会被其解读为**周二~周六**，导致周一漏跑、周六空跑（官方 issue 286，v4 才对齐；T7.6 定时核对已实测修正）。
 > - **时间与开关走系统配置**（设置页可改、即时生效）：`SCHEDULER_ENABLED`（总开关）+ `COLLECT_AM_CRON`/`COLLECT_PM_CRON`（cron）+ `COLLECT_AM_ENABLED`/`COLLECT_PM_ENABLED`/`REPORT_AM_ENABLED`/`REPORT_PM_ENABLED`（四类任务开关）。
 > - **交易日前置判断在执行器之外**：非交易日对「仅交易日」任务**不进入** `run_task`，直接写 `task_log(status="skipped")` 并返回 `{executed: False, reason: "non_trading_day"}` —— 不重试、不告警、不生成报告（落实「非交易日只跑资讯线和巡检」）。
-> - **执行与容错**：交易日任务经统一执行器 `run_task(name, func)`（3 次退避重试 + 失败告警 `alert`，webhook 预留）；任务本体签名 `fn(db, **kwargs)`。资讯线 `collect_overnight` 显式 `pick_sources("news")` + `call_source` 以标注来源，无可用接口配置或全线路失败抛 `502` 并写 `failed`，个别线路失败仅汇总不整体失败。
+> - **执行与容错**：交易日任务经统一执行器 `run_task(name, func)`（3 次退避重试 + 失败告警 `alert`，webhook **T7.6 已接真**，口径见 §1.4）；任务本体签名 `fn(db, **kwargs)`。资讯线 `collect_overnight` 显式 `pick_sources("news")` + `call_source` 以标注来源，无可用接口配置或全线路失败抛 `502` 并写 `failed`，个别线路失败仅汇总不整体失败。
 > - **TZ 自检** `tz_selfcheck()`：启动时校验 `settings.timezone` 与 APScheduler 时区均为 `Asia/Shanghai`，不一致记 `error`（08:00/17:00 定时报告错位的根因）。
 > - **启动/关闭**：`lifespan` 内 `build_scheduler(db)`（**不自动 start**）→ `start()`，退出 `shutdown(wait=False)`；`SCHEDULER_ENABLED=false` 可整体关闭进程内调度器（测试/手工补跑）。
+
+> **T7.6 落地口径**（实现 `backend/app/services/task_runner.py`，验证脚本 `backend/scripts/eval_three_day_reports.py`）：
+> - **失败告警接真**：`alert(task_name, message, db=None) -> bool` 依次做 ① `error` 级 ALERT 日志、② `task_log` warning 行（`告警:<task_name>`）、③ webhook `POST`（见 §1.4）。实现关键顺序：**先 `_resolve_webhook(db)` 解析地址，再写 task_log，最后关会话**；webhook 由 `config_store.get_effective("alert_webhook")` 解析（配置页覆盖 > `.env` > 默认空），投递失败只 `logger.warning` 并返回 `False`，**不影响任务与日志留痕**。
+> - **首建报告时间戳**：`report.generate_and_store` 新建记录时显式写 `generated_at=datetime.now()`（与覆盖分支同口径；此前依赖 `server_default`，在 SQLite 下为 UTC、MySQL 下随会话时区，会与本地时间不一致）。
+> - **三日验证口径**：`scripts/eval_three_day_reports.py --offline` 用确定性 LLM 桩，经注册表 `run_job` 注入 `run_date` 连跑 3 个交易日 —— A 段用 APScheduler `CronTrigger` 真实推算核对 08:00/17:00（含**周一触发**、当日已过顺延次日、周六不触发）；B 段核对每日各出 1 篇、`generated_at` 为本次运行写入、`version==1`、每日新增 2 条 success 顶层日志；C 段负向对照周六只留 1 条 skipped。退出码 0 = 全通过。真实连跑（去掉 `--offline`）需真机配置 LLM Key，随部署后执行。
 
 ---
 
