@@ -6,7 +6,8 @@ import {
   DatePicker,
   Descriptions,
   Form,
-  InputNumber,
+InputNumber,
+  Progress,
   Row,
   Select,
   Space,
@@ -119,6 +120,7 @@ export default function BacktestPage() {
   }
 
   const result = record?.result ?? {}
+  const progress = record?.progress
   const curve: { date: string; equity: number }[] = result.equity_curve ?? []
   const trades: TradeRow[] = (result.trade_details ?? result.trades ?? []).map(
     (t: TradeRow, i: number) => ({ ...t, key: i }),
@@ -213,9 +215,32 @@ export default function BacktestPage() {
         </Col>
         <Col xs={24} lg={16}>
           <Card title="回测结果">
-            {running && (
-              <div style={{ textAlign: 'center', padding: 48 }}>
-                <Spin tip="回测运行中（异步任务，长周期请耐心等待）…" />
+{running && (
+              <div style={{ padding: '32px 8px' }}>
+                {progress && progress.total ? (
+                  <>
+                    <Progress
+                      percent={Math.round(progress.percent)}
+                      status="active"
+                      format={(p) => `${p}%（${progress.done}/${progress.total} 交易日）`}
+                    />
+                    <Typography.Text type="secondary">
+                      {record?.status === 'queued'
+                        ? '已入队，等待执行槽位（并发上限 2，超出排队）…'
+                        : '回测运行中（异步任务，长周期请耐心等待）…'}
+                    </Typography.Text>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center' }}>
+                    <Spin
+                      tip={
+                        record?.status === 'queued'
+                          ? '已入队，等待执行槽位…'
+                          : '回测运行中（异步任务，长周期请耐心等待）…'
+                      }
+                    />
+                  </div>
+                )}
               </div>
             )}
             {!running && record && record.status === 'success' && (

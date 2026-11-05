@@ -18,6 +18,7 @@
    成交与盈亏用**后复权价**（除权不失真，与 T5.5 口径一致）
 9. 数量按目标金额/成交价向下取整股（不强制整手，简化口径）；单票目标资产=总资产/max_positions
 10. 逐笔记录可追溯：signal_date（信号日）/ date（成交日）/ reason / price / fee 全留
+11. **进度回传**（T5.8）：simulate(..., progress_cb) 逐交易日回调 (done, total)，长周期回测可查进度
 
 输出：trades（逐笔）、equity_curve（按日 mark-to-market 后复权收盘）、events
 （顺延/取消/涨停跌停跳过留痕）、final_equity、open_orders（期末未成交挂单）。
@@ -47,11 +48,13 @@ class _Order:
 
 def simulate(data: dict[str, list[dict]], candidate_fn, start: date, end: date,
              initial_capital: float = 100000.0,
-             rules: TradeRules | None = None) -> dict:
+             rules: TradeRules | None = None,
+             progress_cb=None) -> dict:
     """执行回测模拟，返回 trades / equity_curve / events / final_equity / open_orders。
 
     data: {code: 序列}（backtest_data.load_series 输出：含不复权与后复权字段）
     candidate_fn: (date) -> list[str] 有序候选（信号源，如 backtest_signals）
+    progress_cb: 可选 (done, total) 进度回调（T5.8 异步可查进度，逐交易日触发）
     """
     rules = rules or TradeRules()
     rules.max_positions = max(1, int(rules.max_positions))
@@ -84,9 +87,11 @@ def simulate(data: dict[str, list[dict]], candidate_fn, start: date, end: date,
 
     def _event(d, code, kind, detail):
         events.append({"date": d.isoformat(), "code": code,
-                       "type": kind, "detail": detail})
+"type": kind, "detail": detail})
 
     for i, d in enumerate(calendar):
+        if progress_cb is not None:
+            progress_cb(i, len(calendar))  # T5.8 进度回传（已处理交易日/总交易日）
         # ---------- 开盘撮合：先卖后买（T+1/顺延订单） ----------
         for code in list(pending_sells):
             order = pending_sells[code]

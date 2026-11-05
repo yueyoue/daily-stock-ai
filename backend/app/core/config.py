@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     # 选股扫描预算（开发文档 §4 模块4：全市场扫描 ≤20s）
     selector_scan_budget_s: float = 20.0
 
+    # 回测任务队列（T5.8：长周期回测走后台队列，HTTP 立即返回不超时）
+    backtest_max_concurrent: int = 2          # 同时在跑的回测数（超出则在队列中等待）
+    backtest_queue_timeout_s: float = 1800.0  # 排队等待上限（秒），超时置 failed 留因
+
     # 前端产物目录（单镜像由后端托管，开发文档 §8.1）
     frontend_dist: str = "frontend/dist"
 

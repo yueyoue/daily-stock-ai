@@ -264,6 +264,13 @@ export interface BacktestRunPayload {
   max_positions?: number
 }
 
+export interface BacktestProgress {
+  done: number
+  total: number
+  percent: number
+  updated_at?: string
+}
+
 export interface BacktestRecord {
   id: number
   status: string // queued / running / success / failed
@@ -271,6 +278,8 @@ export interface BacktestRecord {
   start_date: string | null
   end_date: string | null
   initial_capital: number
+  /** T5.8：运行进度（queued/running 期间由引擎逐交易日写回，可实时查询） */
+  progress?: BacktestProgress
   result: Record<string, any>
   created_at: string | null
 }
