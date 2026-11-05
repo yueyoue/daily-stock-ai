@@ -350,6 +350,19 @@
 
 > **所有调度前置判断交易日**（`trade_calendar` 表，来源见 2.4.3）：非交易日只跑资讯线和巡检，不生成报告。容器与调度器必须使用 `TZ=Asia/Shanghai`。
 
+> **T7.5 落地口径**（实现 `backend/app/scheduler/registry.py`、`backend/app/scheduler/collect_jobs.py`）：
+> - **声明式注册表** `JOB_REGISTRY`（顺序即时间线；每项含名称、cron 来源、启用开关来源、任务函数引用 `func_ref`、是否仅交易日 `trading_only`）：
+>   `collect_overnight`（`COLLECT_AM_CRON`，默认 `30 7 * * *`，每日，含非交易日）→
+>   `report_morning`（`REPORT_AM_CRON`，默认 `0 8 * * 1-5`，仅交易日）→
+>   `collect_close`（`COLLECT_PM_CRON`，默认 `30 15 * * 1-5`，仅交易日）→
+>   `build_indicator_cache`（固定 `0 16 * * 1-5`，仅交易日）→
+>   `report_afternoon`（`REPORT_PM_CRON`，默认 `0 17 * * 1-5`，仅交易日）。
+> - **时间与开关走系统配置**（设置页可改、即时生效）：`SCHEDULER_ENABLED`（总开关）+ `COLLECT_AM_CRON`/`COLLECT_PM_CRON`（cron）+ `COLLECT_AM_ENABLED`/`COLLECT_PM_ENABLED`/`REPORT_AM_ENABLED`/`REPORT_PM_ENABLED`（四类任务开关）。
+> - **交易日前置判断在执行器之外**：非交易日对「仅交易日」任务**不进入** `run_task`，直接写 `task_log(status="skipped")` 并返回 `{executed: False, reason: "non_trading_day"}` —— 不重试、不告警、不生成报告（落实「非交易日只跑资讯线和巡检」）。
+> - **执行与容错**：交易日任务经统一执行器 `run_task(name, func)`（3 次退避重试 + 失败告警 `alert`，webhook 预留）；任务本体签名 `fn(db, **kwargs)`。资讯线 `collect_overnight` 显式 `pick_sources("news")` + `call_source` 以标注来源，无可用接口配置或全线路失败抛 `502` 并写 `failed`，个别线路失败仅汇总不整体失败。
+> - **TZ 自检** `tz_selfcheck()`：启动时校验 `settings.timezone` 与 APScheduler 时区均为 `Asia/Shanghai`，不一致记 `error`（08:00/17:00 定时报告错位的根因）。
+> - **启动/关闭**：`lifespan` 内 `build_scheduler(db)`（**不自动 start**）→ `start()`，退出 `shutdown(wait=False)`；`SCHEDULER_ENABLED=false` 可整体关闭进程内调度器（测试/手工补跑）。
+
 ---
 
 ## 5. 数据存储方案（入库 vs 不入库）
