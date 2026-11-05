@@ -284,7 +284,11 @@
 
 ### 模块 6：热点题材库 & 资讯过滤
 - 自动抓取每日热点，按产业链标签结构化归档
-- 资讯降噪：LLM 过滤无关新闻，只保留对盘面有影响的消息，标记高/中/低影响等级
+- 资讯降噪：LLM 判定影响等级，标记 高/中/低；与盘面基本无关的消息标 `无关`（**不删除、只标记**，不丢数据）
+  - 列表默认隐藏「无关」（`/api/news/list` 的 `only_relevant=true`）；显式 `impact_level=无关` 或 `only_relevant=false` 可查看全量
+  - 未分级（`impact_level` 为空）的资讯仍正常展示，避免分级前"看不见"
+  - LLM 不可用/输出无法解析：对应批次保持「未分级」原样，仅记 task_log 与统计，绝不因 LLM 故障丢数据
+  - 自检脚本：`backend/scripts/eval_news_classify.py`（20 条人工标注样本；`--offline` 验证零丢失兜底）
 - 检索：支持按板块、关键词、日期检索
 - 资讯源清单及频率限制见 2.4.3（东财类接口严格限流，作备用/低频使用）
 
@@ -410,7 +414,7 @@
 | stock_strategy | 用户选股策略 | 策略名、条件json |
 | backtest_record | 回测记录 | 策略、区间、结果json |
 | hot_topic | 热点题材库 | 标题、产业链、关联个股、日期 |
-| news | 过滤后资讯 | 标题、影响等级、来源、日期 |
+| news | 过滤后资讯 | 标题、影响等级（高/中/低/无关/未分级）、来源、日期 |
 | watch_list | 掘金观察池 | 标的、关注维度（一期单用户，无用户字段） |
 | data_source_log | 数据源采集记录 | 数据类型、主/备源、状态、耗时 |
 | data_reconcile | 数据交叉对账 | 对账项、各源值、差异、对账结果 |
@@ -447,7 +451,8 @@
 | POST | /api/backtest/run | 提交回测任务 |
 | GET | /api/backtest/{id} | 获取回测状态/进度/结果（含 progress 进度字段） |
 | GET | /api/hot_topic/list | 热点列表（板块/关键词/日期检索） |
-| GET | /api/news/list | 资讯列表（板块/关键词/日期/影响等级/来源过滤） |
+| GET | /api/news/list | 资讯列表（板块/关键词/日期/影响等级/来源过滤；默认隐藏「无关」，`only_relevant=false` 返回全量） |
+| POST | /api/news/classify | 对未分级资讯执行 LLM 降噪分级（limit/batch_size；失败兜底保持未分级、不丢数据） |
 | GET | /api/watchlist/list | 观察池列表 |
 | POST | /api/watchlist/add | 加入观察池 |
 | DELETE | /api/watchlist/{id} | 移出观察池 |
