@@ -428,16 +428,28 @@
 
 ### 5.4 设置项设计（系统配置页）
 
-| 配置项 | 类型 | 默认值 | 说明 |
+> 下表已按实现同步（`backend/app/services/config_store.py` 的 `CONFIG_SPEC`，共 14 个键）。
+> 生效优先级：**运行时保存值 > 同名环境变量（`Settings`）> 规格默认值**。
+
+| 配置项（键名） | 类型 | 默认值 | 说明 |
 |---|---|---|---|
-| 技术指标入库开关 | 布尔开关 | 关闭（不入库） | 开启→指标写入库表并每日增量；关闭→走本地缓存方案 |
-| 指标缓存保留天数 | 数字 | 3 | 按交易日滚动保留 N 个版本，过期自动清理 |
-| 指标计算引擎 | 下拉 | TA-Lib | TA-Lib / pandas 内置实现（降级用） |
+| 技术指标入库开关 `tech_indicator_store` | 布尔 | 关闭 | 开启→指标写入库表并每日增量；关闭→走本地缓存方案（模式B） |
+| 指标缓存保留天数 `indicator_cache_days` | 数字（1~30） | 3 | 按交易日滚动保留 N 个版本，过期自动清理 |
+| 指标计算引擎 `indicator_engine` | 下拉（talib/pandas） | talib | TA-Lib 主引擎 / pandas 内置降级 |
+| 早报时间 `report_am_cron` | cron | `0 8 * * mon-fri` | 盘前早报（交易日 08:00） |
+| 复盘时间 `report_pm_cron` | cron | `0 17 * * mon-fri` | 盘后复盘（交易日 17:00） |
+| 隔夜资讯线 `collect_am_cron` | cron | `30 7 * * *` | 每日 07:30（非交易日仍抓资讯） |
+| 收盘采集线 `collect_pm_cron` | cron | `30 15 * * mon-fri` | 交易日 15:30 收盘采集 |
+| 采集线开关 `collect_am_enabled` / `collect_pm_enabled` | 布尔 | 开 | 分别启停两条采集定时任务 |
+| 报告线开关 `report_am_enabled` / `report_pm_enabled` | 布尔 | 开 | 分别启停早报 / 复盘定时任务 |
+| LLM 模型 `llm_model` | 下拉/文本 | qwen-plus | 多模型切换 |
+| LLM API Key `llm_api_key` | 密码框（遮蔽） | — | 仅环境变量注入，页面只显示尾号 + 测试按钮 |
+| 失败告警 `alert_webhook` | 文本（URL） | 空 | 留空=失败只落日志与 `task_log`；填 URL=重试用尽后 POST JSON 告警（3s 超时 best-effort） |
 | 数据源接口配置 | 增删改表 | 见 2.4.3 | 接口的新增/修改/启停/优先级/连通测试 |
-| 早报/复盘定时时间 | 时间 | 08:00 / 17:00 | cron 可配置 |
-| LLM 模型选择 | 下拉 | 通义千问 | 多模型切换 |
-| LLM API Key | 密码框（遮蔽） | — | 仅环境变量注入，页面只显示尾号+测试按钮 |
 | 登录密码管理 | 修改密码 | — | 单管理员账号 |
+
+> **cron 星期段必须写 `mon-fri` 这类名称**：APScheduler 3.x 中 `0=周一`（与 crontab `0=周日` 不同），写数字 `1-5` 实为周二~周六，会漏跑周一。
+> 另：接口文档开关 `API_DOCS_ENABLED` 为**环境变量**（非设置页项），见 §8.4。
 
 ### 5.5 容量估算（全 A 约 5300 只）
 
@@ -485,39 +497,47 @@
 > **错误码表**（code=HTTP 语义状态码；新增错误码先在 `core/errors.py` ERROR_CODES 登记再使用）：
 > 400 参数错误/校验失败 ｜ 401 未登录或会话过期 ｜ 403 无权限 ｜ 404 资源不存在 ｜ 409 状态冲突 ｜ 429 请求过于频繁/登录锁定 ｜ 500 服务器内部错误 ｜ 502 数据源全部失败（外部接口不可用） ｜ 503 服务不可用（依赖缺失/未就绪） ｜ 504 处理超时（扫描/任务超预算）。
 >
-> **分页出参**：`{items, total, page, page_size}`（page 从 1 起，page_size 1~200）。OpenAPI 可浏览：`/docs`（重定向）→ `/api/docs`。
+> **分页出参**：`{items, total, page, page_size}`（page 从 1 起，page_size 1~200）。OpenAPI 可浏览：`/docs`（重定向）→ `/api/docs`；生产环境可置 `API_DOCS_ENABLED=false` 关闭对外暴露（见 §8.4）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | /api/health | 健康检查（Docker 健康检查、反代探活） |
-| POST | /api/auth/login | 登录（限速：5 次失败锁 10 分钟） |
+| GET | /api/health | 健康检查（Docker 健康检查、反代探活）**（免鉴权）** |
+| POST | /api/auth/login | 登录（限速：5 次失败锁 10 分钟）**（免鉴权）** |
 | GET | /api/auth/session | 当前登录会话（路由守卫用） |
 | POST | /api/auth/logout | 退出登录 |
 | POST | /api/auth/password | 修改密码 |
 | GET | /api/dashboard/market | 大盘首页数据 |
 | GET | /api/report/list | 报告列表 |
-| GET | /api/report/{id} | 单篇报告详情 |
+| GET | /api/report/{report_id} | 单篇报告详情 |
 | POST | /api/report/regenerate | 重新生成指定日期报告（走 LLM 流水线，响应含 `ok`/`attempts`/`fallback`/`llm_used`/`problems`；校验重试用尽→502，LLM 未就绪→骨架降级） |
 | POST | /api/selector/scan | 执行选股扫描 |
+| GET | /api/selector/strategies | 选股策略列表 |
+| POST | /api/selector/strategies | 新建选股策略 |
+| PUT | /api/selector/strategies/{strategy_id} | 修改选股策略 |
+| DELETE | /api/selector/strategies/{strategy_id} | 删除选股策略 |
 | POST | /api/backtest/run | 提交回测任务 |
-| GET | /api/backtest/{id} | 获取回测状态/进度/结果（含 progress 进度字段） |
+| GET | /api/backtest/{backtest_id} | 获取回测状态/进度/结果（含 progress 进度字段） |
 | GET | /api/hot_topic/list | 热点列表（板块/关键词/日期检索） |
 | GET | /api/news/list | 资讯列表（板块/关键词/日期/影响等级/来源过滤；默认隐藏「无关」，`only_relevant=false` 返回全量） |
 | POST | /api/news/classify | 对未分级资讯执行 LLM 降噪分级（limit/batch_size；失败兜底保持未分级、不丢数据） |
 | GET | /api/watchlist/list | 观察池列表 |
 | POST | /api/watchlist/add | 加入观察池 |
-| DELETE | /api/watchlist/{id} | 移出观察池 |
+| DELETE | /api/watchlist/{item_id} | 移出观察池 |
 | GET | /api/task/status | 任务状态查询 |
 | POST | /api/collect/trigger | 手动触发采集（原型按钮对应） |
 | GET | /api/config/get | 读取系统配置（Key 遮蔽） |
 | POST | /api/config/save | 保存系统配置 |
+| POST | /api/config/test_llm | LLM 连通测试（发一次最小 completion，响应不含 Key 明文） |
 | GET | /api/datasource/status | 各数据源健康/切换状态 |
 | GET | /api/datasource/interfaces | 接口配置列表 |
 | POST | /api/datasource/interfaces | 新增接口 |
-| PUT | /api/datasource/interfaces/{id} | 修改接口（含启停、优先级） |
-| DELETE | /api/datasource/interfaces/{id} | 删除接口 |
-| POST | /api/datasource/interfaces/{id}/test | 连通性测试 |
-| GET | /api/reconcile/list | 数据对账记录 |
+| PUT | /api/datasource/interfaces/{source_id} | 修改接口（含启停、优先级） |
+| DELETE | /api/datasource/interfaces/{source_id} | 删除接口 |
+| POST | /api/datasource/interfaces/{source_id}/test | 连通性测试 |
+| GET | /api/docs | Swagger UI（`API_DOCS_ENABLED=false` 时不注册该路由，未登录直接 401） |
+| GET | /api/openapi.json | OpenAPI 描述（同上开关控制） |
+
+> 上表共 **35 条**（含 `docs`/`openapi` 两条受开关控制）。**数据对账**（`services/reconcile.py`，多源取多数一致、差异写 `data_reconcile` 表，T1.5）一期为**内部服务**，未开放独立 API——原计划的 `GET /api/reconcile/list` 未实现，对账结果经任务日志/库表查看，二期可增列。
 
 ---
 
