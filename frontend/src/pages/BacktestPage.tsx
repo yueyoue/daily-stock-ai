@@ -6,7 +6,8 @@ import {
   DatePicker,
   Descriptions,
   Form,
-InputNumber,
+  Input,
+  InputNumber,
   Progress,
   Row,
   Select,
@@ -43,6 +44,25 @@ const RISK_NOTICE = '回测基于历史数据模拟，不代表未来收益'
 
 const pct = (v: number | null | undefined, digits = 1) =>
   v == null ? '—' : `${(v * 100).toFixed(digits)}%`
+
+/** D-04：自定义选股条件（ScanSpec JSON）解析——空串视为未填，非法 JSON 返回 'invalid' */
+const parseConditions = (raw?: string): Record<string, unknown> | null | 'invalid' => {
+  const text = (raw ?? '').trim()
+  if (!text) return null
+  try {
+    const obj = JSON.parse(text)
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return 'invalid'
+    return obj as Record<string, unknown>
+  } catch {
+    return 'invalid'
+  }
+}
+
+/** D-04：表单校验器——条件 JSON 非法时即时提示（不阻断留空） */
+const validateConditions = (raw?: string) =>
+  parseConditions(raw) === 'invalid'
+    ? Promise.reject(new Error('条件 JSON 非法，请检查格式'))
+    : Promise.resolve()
 
 export default function BacktestPage() {
   const [form] = Form.useForm()
@@ -92,12 +112,23 @@ export default function BacktestPage() {
   const onFinish = async (values: {
     range: [Dayjs, Dayjs]
     initial_capital: number
-    strategy_id: number
+    strategy_id?: number
+    conditions?: string
     fee_rate: number
     slippage: number
     limit_pct: number
     max_positions: number
   }) => {
+    // D-04：strategy_id 与自定义 conditions 二选一；两者皆空则拦下，不发起无效请求
+    const parsed = parseConditions(values.conditions)
+    if (parsed === 'invalid') {
+      message.error('自定义选股条件 JSON 非法，请检查格式')
+      return
+    }
+    if (values.strategy_id == null && parsed == null) {
+      message.warning('请选择已保存策略，或填写自定义选股条件（至少一项）')
+      return
+    }
     setRunning(true)
     setRecord(null)
     try {
@@ -105,7 +136,8 @@ export default function BacktestPage() {
         start_date: values.range[0].format('YYYY-MM-DD'),
         end_date: values.range[1].format('YYYY-MM-DD'),
         initial_capital: values.initial_capital,
-        strategy_id: values.strategy_id,
+        strategy_id: values.strategy_id ?? null,
+        conditions: parsed,
         fee_rate: values.fee_rate,
         slippage: values.slippage,
         limit_pct: values.limit_pct,
@@ -125,6 +157,8 @@ export default function BacktestPage() {
   const trades: TradeRow[] = (result.trade_details ?? result.trades ?? []).map(
     (t: TradeRow, i: number) => ({ ...t, key: i }),
   )
+  // D-12 修复：平仓笔数为 0（区间内无有效交易样本）时，收益类指标统一按「—」展示。
+  const noSamples = result.closed_trades === 0
 
   const columns: ColumnsType<TradeRow> = [
     { title: '成交日', dataIndex: 'date', key: 'date' },
@@ -179,10 +213,37 @@ export default function BacktestPage() {
                 max_positions: 5,
               }}
             >
-              <Form.Item name="strategy_id" label="选股策略" rules={[{ required: true, message: '请选择策略' }]}>
+              <Form.Item
+                name="strategy_id"
+                label="选股策略（与下方自定义条件二选一）"
+                rules={[
+                  {
+                    validator: (_, v) => {
+                      const cond = form.getFieldValue('conditions')
+                      if (v == null && parseConditions(cond) == null) {
+                        return Promise.reject(new Error('选股策略与自定义条件至少填一项'))
+                      }
+                      return Promise.resolve()
+                    },
+                  },
+                ]}
+              >
                 <Select
+                  allowClear
                   placeholder="选择已保存策略（选股器页保存）"
                   options={strategies.map((s) => ({ value: s.id, label: s.name }))}
+                />
+              </Form.Item>
+              {/* D-04：回测条件直填入口——无需先存策略即可回测（ScanSpec JSON） */}
+              <Form.Item
+                name="conditions"
+                label="自定义选股条件（JSON，可选）"
+                extra='格式示例：{"logic":"and","conditions":[{"factor":"roe","op":">=","value":15}]}'
+                rules={[{ validator: (_, v) => validateConditions(v) }]}
+              >
+                <Input.TextArea
+                  rows={4}
+                  placeholder='{"logic":"and","conditions":[{"factor":"roe","op":">=","value":15}]}'
                 />
               </Form.Item>
               <Form.Item name="range" label="时间区间" rules={[{ required: true }]}>
@@ -215,7 +276,7 @@ export default function BacktestPage() {
         </Col>
         <Col xs={24} lg={16}>
           <Card title="回测结果">
-{running && (
+            {running && (
               <div style={{ padding: '32px 8px' }}>
                 {progress && progress.total ? (
                   <>
@@ -245,32 +306,46 @@ export default function BacktestPage() {
             )}
             {!running && record && record.status === 'success' && (
               <>
+                {/* D-12 修复：平仓笔数为 0 时收益类指标统一显示「—」，避免「总收益 0.0%」被误读。 */}
                 <Row gutter={12} style={{ marginBottom: 16 }}>
                   <Col span={6}>
                     <Statistic
                       title="总收益"
-                      value={pct(result.cumulative_return)}
-                      valueStyle={{ color: (result.cumulative_return ?? 0) >= 0 ? '#10b981' : '#ef4444' }}
+                      value={noSamples ? '—' : pct(result.cumulative_return)}
+                      valueStyle={
+                        noSamples
+                          ? undefined
+                          : { color: (result.cumulative_return ?? 0) >= 0 ? '#10b981' : '#ef4444' }
+                      }
                     />
                   </Col>
                   <Col span={6}>
-                    <Statistic title="胜率" value={pct(result.win_rate)} />
+                    <Statistic title="胜率" value={noSamples ? '—' : pct(result.win_rate)} />
                   </Col>
                   <Col span={6}>
                     <Statistic
                       title="最大回撤"
-                      value={result.max_drawdown == null ? '—' : `-${pct(result.max_drawdown)}`}
-                      valueStyle={{ color: '#ef4444' }}
+                      value={noSamples || result.max_drawdown == null ? '—' : `-${pct(result.max_drawdown)}`}
+                      valueStyle={noSamples ? undefined : { color: '#ef4444' }}
                     />
                   </Col>
                   <Col span={6}>
                     <Statistic
                       title="盈亏比"
-                      value={result.profit_loss_ratio ?? '—'}
-                      precision={2}
+                      value={noSamples ? '—' : (result.profit_loss_ratio ?? '—')}
+                      precision={noSamples ? undefined : 2}
                     />
                   </Col>
                 </Row>
+                {noSamples && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 12 }}
+                    message="样本不足：区间内平仓笔数为 0，收益类指标不具参考意义"
+                    description="如需有效结果，请先采集该区间的 K 线数据后重新运行回测。"
+                  />
+                )}
                 <EChart
                   height={260}
                   option={{

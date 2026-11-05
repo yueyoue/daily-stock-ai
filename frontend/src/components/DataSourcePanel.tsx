@@ -21,6 +21,21 @@ import type { SourceInterface, SourcePayload } from '../api/client'
 
 /** 数据源接口配置（T4.8，开发文档 §2.4：增删改/启停/优先级/连通测试/健康状态） */
 
+/**
+ * D-08 修复：部分数据源接口必须携带业务参数才能试采
+ * （kline/finance/stock_info 需 code，pywencai 系需 query）。
+ * 连通性测试按数据类型/实现自动附样例参数，避免「必失败」的误导性结果。
+ */
+function sampleParams(r: SourceInterface): Record<string, unknown> | undefined {
+  const ref = (r.impl_ref || '').toLowerCase()
+  if (ref.includes('wencai')) return { query: '今日涨幅前20的股票' }
+  if (r.data_type === 'kline' || r.data_type === 'finance' || r.data_type === 'stock_info') {
+    return { code: '000001' }
+  }
+  if (r.data_type === 'research_report') return { code: '000001' }
+  return undefined
+}
+
 function fmtTime(iso: string | null): string {
   if (!iso) return '—'
   const d = new Date(iso)
@@ -156,7 +171,8 @@ export default function DataSourcePanel() {
   const runTest = async (r: SourceInterface) => {
     setTestingId(r.id)
     try {
-      const res = await datasourceApi.test(r.id)
+      // D-08 修复：按数据类型附样例参数，避免需参数据源（kline/finance 等）测试必失败
+      const res = await datasourceApi.test(r.id, sampleParams(r))
       if (res.ok) {
         message.success(`连通正常：试采 ${res.count} 条，耗时 ${res.duration_ms}ms`)
       } else {

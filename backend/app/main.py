@@ -121,9 +121,63 @@ if _DIST.exists():
     if (_DIST / "assets").exists():
         app.mount("/assets", StaticFiles(directory=_DIST / "assets"), name="assets")
 
+    def _iter_route_methods(routes, prefix: str = "") -> list[tuple[str, set[str]]]:
+        """递归展开路由注册表为 (路径, 可用方法) 列表。
+
+        兼容 FastAPI 新版（≥0.16x）：include_router 不再把子路由平铺进 app.routes，
+        而是包装成 _IncludedRouter（本身没有 path/methods），真实路由挂在
+        original_router.routes 上；旧版则是直接平铺的 APIRoute/Mount。
+        """
+        out: list[tuple[str, set[str]]] = []
+        for route in routes:
+            path = getattr(route, "path", None)
+            methods = getattr(route, "methods", None)
+            if path is not None and methods is not None:
+                out.append((prefix + path, set(methods)))
+                continue
+            ctx = getattr(route, "include_context", None)
+            sub_prefix = (prefix + (getattr(ctx, "prefix", "") or "")
+                          if ctx is not None else prefix)
+            sub = getattr(getattr(route, "original_router", None), "routes", None)
+            if sub is None:
+                sub = getattr(route, "routes", None)
+            if sub:
+                out.extend(_iter_route_methods(sub, sub_prefix))
+        return out
+
+    _API_METHODS: dict[str, set[str]] = {}
+
+    def _build_api_methods() -> None:
+        """建立 /api 路径 → 可用方法集合的索引（首次调用建立后缓存）。"""
+        if _API_METHODS:
+            return
+        for path, methods in _iter_route_methods(app.routes):
+            if path.startswith("/api"):
+                _API_METHODS.setdefault(path, set()).update(methods)
+
+    def _api_allowed_methods(request_path: str) -> set[str]:
+        """D-09 修复：收集已注册的同路径 API 路由所支持的方法。
+
+        SPA 兜底路由会吞掉所有 GET 请求，导致「路径存在但方法不匹配」被误判为
+        404。此处按路由注册表反查真实可用方法，用于正确返回 405。
+        """
+        _build_api_methods()
+        return set(_API_METHODS.get(request_path, set()))
+
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
         # 非 /api 路径一律回前端入口（前端路由自行处理），避免深链接 404
         if full_path.startswith("api/"):
+            # D-09：路径已注册但当前方法不支持 → 405（带 Allow 头）；路径不存在 → 404
+            allowed = _api_allowed_methods("/" + full_path)
+            allowed.discard("GET")
+            allowed.discard("HEAD")
+            if allowed:
+                allow_header = ", ".join(sorted(allowed | {"GET", "OPTIONS"}))
+                raise HTTPException(
+                    status_code=405,
+                    detail=f"方法不允许（{'/' + full_path} 仅支持 {allow_header}）",
+                    headers={"Allow": allow_header},
+                )
             raise HTTPException(status_code=404, detail="接口不存在")
         return FileResponse(_DIST / "index.html")

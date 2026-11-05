@@ -3,6 +3,9 @@
 - 采集器不硬编码接口：按「数据类型 → 启用中优先级最高」取接口，失败由采集链降级
 - impl_ref 约定："模块:类"（实例化后有 fetch(**params)）或 "模块:函数"（直接调用）
 - CRUD 供系统设置页（T3.5 API / T4.8 UI）；每次调用写 data_source_log
+
+⚠️ 缺陷 D-03 修复：接口配置的 timeout_sec 真实施加到取数调用上
+（call_source / probe_source 统一走 call_with_timeout），超时抛 TimeoutError → 采集链降级。
 """
 import importlib
 import logging
@@ -14,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.models.system import DataSourceConfig, DataSourceLog
 from app.utils.ratelimit import RateLimiter
+from app.utils.timeout import call_with_timeout
 
 logger = logging.getLogger("app.source_registry")
 
@@ -78,7 +82,12 @@ def write_log(
             message=message[:500],
         )
     )
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        # 会话已在 pending-rollback 态时也要能落日志（D-01 同类兜底）
+        db.rollback()
+        logger.warning("数据源日志写入失败（已回滚忽略）")
 
 
 def call_source(db: Session, source: DataSourceConfig, **params) -> list[dict]:
@@ -86,13 +95,15 @@ def call_source(db: Session, source: DataSourceConfig, **params) -> list[dict]:
 
     params_template 作为默认参数合并（调用方参数优先）——接口行为差异
     （如 stock_info 主源带概念/备源轻量）由配置控制，不写死在调用方。
+    timeout_sec 作为取数截止时间真实生效（D-03）。
     """
     _rate_limiter.wait(f"src:{source.id}", source.qps_limit)
     t0 = time.monotonic()
     merged = {**(source.params_template or {}), **params}
     try:
         collector = build_collector(source)
-        records = collector.fetch(**merged) or []
+        records = call_with_timeout(lambda: collector.fetch(**merged) or [],
+                                    source.timeout_sec) or []
         duration_ms = int((time.monotonic() - t0) * 1000)
         source.last_ok_at = datetime.now()
         source.last_error = ""
@@ -141,18 +152,24 @@ def delete_source(db: Session, source_id: int) -> None:
     db.commit()
 
 
-def probe_source(db: Session, source_id: int) -> dict:
-    """连通性测试：试采 1 次（用接口自带参数模板），返回结果供设置页展示。
+def probe_source(db: Session, source_id: int, params: dict | None = None) -> dict:
+    """连通性测试：试采 1 次，返回结果供设置页展示。
 
-    ⚠️ 命名注意：服务函数禁止用 test_ 前缀（pytest 会误收集），故名 probe_source。
+    - 参数 = 接口自带 params_template 合并调用方传入的样例参数（调用方优先）。
+      D-08 修复：kline / finance / research_report 等"需 code/query 参数"的数据源
+      仅靠 params_template 无法试采，允许在测试请求里带样例参数完成试采。
+    - ⚠️ 命名注意：服务函数禁止用 test_ 前缀（pytest 会误收集），故名 probe_source。
+    - timeout_sec 作为取数截止时间真实生效（D-03），避免页面无限等待。
     """
     src = db.get(DataSourceConfig, source_id)
     if src is None:
         raise AppError(404, "接口配置不存在")
+    merged = {**(src.params_template or {}), **(params or {})}
     t0 = time.monotonic()
     try:
         collector = build_collector(src)
-        records = collector.fetch(**(src.params_template or {})) or []
+        records = call_with_timeout(lambda: collector.fetch(**merged) or [],
+                                    src.timeout_sec) or []
         duration_ms = int((time.monotonic() - t0) * 1000)
         src.last_ok_at = datetime.now()
         src.last_error = ""

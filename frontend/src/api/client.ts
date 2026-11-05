@@ -57,7 +57,7 @@ export interface AppConfig {
   tech_indicator_store: boolean
   indicator_cache_days: number
   indicator_engine: string
-report_am_cron: string
+  report_am_cron: string
   report_pm_cron: string
   // T7.5 定时调度：采集线时间 + 四类任务开关
   collect_am_cron: string
@@ -66,7 +66,7 @@ report_am_cron: string
   collect_pm_enabled: boolean
   report_am_enabled: boolean
   report_pm_enabled: boolean
-llm_model: string
+  llm_model: string
   llm_api_key_masked: string
   /** T7.6 失败告警 webhook（空串 = 关闭） */
   alert_webhook: string
@@ -161,13 +161,17 @@ export const datasourceApi = {
     request<SourceInterface>(`/api/datasource/interfaces/${id}`, {
       method: 'PUT',
       body: JSON.stringify(payload),
-    }),
+}),
   remove: (id: number) =>
     request<{ ok: boolean }>(`/api/datasource/interfaces/${id}`, { method: 'DELETE' }),
-  test: (id: number) =>
+  /** D-08：需业务参数的数据源（kline/finance/research_report 等）可传入样例参数试采 */
+  test: (id: number, params?: Record<string, unknown>) =>
     request<{ ok: boolean; count: number; duration_ms: number; error?: string }>(
       `/api/datasource/interfaces/${id}/test`,
-      { method: 'POST' },
+      {
+        method: 'POST',
+        body: JSON.stringify({ params: params ?? {} }),
+      },
     ),
 }
 
@@ -267,6 +271,8 @@ export interface BacktestRunPayload {
   end_date: string
   initial_capital: number
   strategy_id?: number | null
+  /** T5.5 / D-04：选股条件 DSL（ScanSpec JSON，如 {logic,conditions:[...]}）；与 strategy_id 二选一 */
+  conditions?: Record<string, unknown> | null
   fee_rate: number
   slippage: number
   limit_pct?: number

@@ -5,12 +5,16 @@
 - sync_market_daily：三条采集线（moneyflow / limit_updown / market_summary）
   各走采集链（主备降级），单线失败不影响其他线（errors 汇总返回）；
   全部失败才抛 502
+
+⚠️ 缺陷 D-01 修复：数值列与 extra 统一走 safe_float/json_safe，NaN / ±Inf 不入库
+（MySQL JSON 列不接受 NaN，会报 3140 并连锁卡死任务行）；commit 失败先 rollback 再抛。
 """
 import logging
 from datetime import date
 
 from sqlalchemy.orm import Session
 
+from app.collectors.util import json_safe, safe_float
 from app.core.errors import AppError
 from app.models.market import MarketDaily
 from app.services.collect_chain import collect_with_fallback
@@ -47,14 +51,19 @@ def upsert_market_daily(db: Session, records: list[dict]) -> dict:
             cache[d] = row
 
         for field in _FIELDS:
-            v = rec.get(field)
+            v = safe_float(rec.get(field))  # NaN / ±Inf / 空 → None，不写库（D-01）
             if v is not None:
                 setattr(row, field, v)
         if rec.get("extra"):
             merged = dict(row.extra or {})
-            merged.update(rec["extra"])
+            merged.update(json_safe(rec["extra"]))  # NaN / ±Inf → None，JSON 列方可入库（D-01）
             row.extra = merged
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        # 会话可能因 flush 失败进入 pending-rollback；先回滚再抛，避免掩盖真实错误（D-01）
+        db.rollback()
+        raise
     return {"dates": len(cache), "inserted": inserted, "updated": updated}
 
 

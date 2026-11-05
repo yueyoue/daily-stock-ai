@@ -3,18 +3,26 @@
 双层语义：Settings（.env）为默认值，system_config 表为运行时覆盖。
 LLM Key 只进不出：保存写库，读取一律掩码（尾号 4 位），响应不含明文字段。
 """
-import re
-
+from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.errors import AppError
 from app.models.config import SystemConfig
 
-# 允许星号/数字/逗号/连字符/斜杠/空格，以及星期英文名（mon-fri）。
-# 星期段必须用 mon-fri 这类名称：APScheduler 3.x 的 0=周一（非 crontab 的 0=周日），
-# 数字 "1-5" 会被解读为周二~周六，导致周一不触发（T7.6 定时核对发现）。
-_CRON_RE = re.compile(r"^[\dA-Za-z\*\,\-\ /]+$")
+
+def _check_cron(value: str) -> str | None:
+    """cron 表达式校验（D-06 修复）：交给 APScheduler 真解析，拒绝一切非法写法。
+
+    合法返回 None，非法返回错误原因。星期段沿用 mon-fri 这类名称：
+    APScheduler 3.x 的 0=周一（非 crontab 的 0=周日），数字 "1-5" 会被解读为
+    周二~周六，导致周一不触发（T7.6 定时核对发现）。
+    """
+    try:
+        CronTrigger.from_crontab(value)
+    except (ValueError, TypeError) as e:
+        return str(e)
+    return None
 
 # 配置项规格（类型 / 默认值 / 约束）；默认值会被同名 Settings 环境变量覆盖
 CONFIG_SPEC: dict[str, dict] = {
@@ -63,8 +71,10 @@ def _validate(key: str, value):
             raise AppError(400, f"{key} 必须是字符串")
         if "choices" in spec and value not in spec["choices"]:
             raise AppError(400, f"{key} 仅支持: {spec['choices']}")
-        if spec.get("cron") and (not value or not _CRON_RE.match(value)):
-            raise AppError(400, f"{key} 不是合法的 cron 表达式")
+        if spec.get("cron"):
+            err = _check_cron(value)
+            if err is not None:
+                raise AppError(400, f"{key} 不是合法的 cron 表达式: {err}")
     return value
 
 

@@ -220,7 +220,10 @@ def run_backtest(record_id: int) -> bool:
                 elapsed = int((time.monotonic() - t0) * 1000)
                 days = len(result.get("equity_curve") or [])
                 result["duration_ms"] = elapsed
-                result["progress"] = {"done": days, "total": days, "percent": 100.0,
+                # D-12：done=total=0 时 percent 仍记 100.0（表示「任务已执行完毕」，
+                # 保持既有契约不变）；「0/0 却显示 100%」的展示口径问题在前端统一处理。
+                result["progress"] = {"done": days, "total": days,
+                                      "percent": 100.0,
                                       "updated_at": datetime.now().isoformat(timespec="seconds")}
                 row = db.get(BacktestRecord, record_id)  # 进度写回过 → 重取避免覆盖
                 row.result = result

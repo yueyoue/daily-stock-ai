@@ -3,6 +3,10 @@
 - 标准化记录：{title, content, published_at, source, url, impact_level, dedup_hash}
 - 去重键：标题归一 + 分钟级时间 归一后哈希（同源重拉/跨批次重叠不重复入库）
 - QPS≤0.5（接口配置登记约束）；真机联调点：akshare 接口名以实测为准（T6.x 演练验证）
+
+⚠️ 缺陷 D-02 修复：akshare≥1.20 起 `stock_telegraph_cls` 已下线，主源改用
+`stock_info_global_cls`（列：标题/内容/发布日期/发布时间，日期与时间分列需拼接；
+首行标题可能为空，由 normalize_news 跳过）。
 """
 import hashlib
 import re
@@ -80,6 +84,24 @@ def normalize_batch(rows: list[dict], source: str) -> list[dict]:
     return out
 
 
+def merge_split_datetime(rows: list[dict]) -> list[dict]:
+    """把「发布日期 + 发布时间」分列的时间拼成完整发布时间（财联社电报新列布局）。
+
+    akshare 的 `stock_info_global_cls` 返回列：标题 / 内容 / 发布日期 / 发布时间，
+    其中「发布时间」只有 `HH:MM:SS`，「发布日期」为日期 —— 需拼接后 normalize_news
+    才能按 `%Y-%m-%d %H:%M:%S` 解析；已是完整 datetime 的行不动。
+    """
+    out = []
+    for raw in rows:
+        item = dict(raw)
+        date_part = str(item.get("发布日期") or "").strip()[:10]
+        pub = str(item.get("发布时间") or "").strip()
+        if date_part and (not pub or ("-" not in pub and "/" not in pub)):
+            item["发布时间"] = f"{date_part} {pub}".strip()
+        out.append(item)
+    return out
+
+
 class ClsNewsCollector(BaseCollector):
     """财联社电报（主源）。"""
 
@@ -92,8 +114,8 @@ class ClsNewsCollector(BaseCollector):
     def _fetch_raw(self, **params) -> list[dict]:
         import akshare as ak
 
-        df = ak.stock_telegraph_cls()
-        return df.to_dict("records")
+        df = ak.stock_info_global_cls(symbol=params.get("symbol") or "全部")
+        return merge_split_datetime(df.to_dict("records"))
 
 
 class ThsNewsCollector(BaseCollector):

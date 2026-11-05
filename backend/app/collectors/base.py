@@ -6,8 +6,13 @@
 
 实现类通过 data_source_config.impl_ref（"模块:类"）注册，采集链动态加载；
 禁止在业务代码里直接 import 具体数据源（§2.4 硬约束）。
+
+⚠️ 缺陷 D-03 修复：连通性测试默认实现接受 timeout_sec，经 call_with_timeout 施加
+截止时间（避免接口挂起时页面无限等待）。
 """
 from abc import ABC, abstractmethod
+
+from app.utils.timeout import call_with_timeout
 
 
 class BaseCollector(ABC):
@@ -19,9 +24,9 @@ class BaseCollector(ABC):
     def fetch(self, **params) -> list[dict]:
         """采集并返回标准化记录。params 来自接口配置的 params_template + 调用方参数。"""
 
-    def test_connection(self, **params) -> bool:
-        """连通性测试默认实现：试采一条。"""
+    def test_connection(self, timeout_sec: float | None = None, **params) -> bool:
+        """连通性测试默认实现：试采一条（timeout_sec 生效，避免接口挂起）。"""
         try:
-            return bool(self.fetch(**params))
+            return bool(call_with_timeout(lambda: self.fetch(**params), timeout_sec))
         except Exception:
             return False

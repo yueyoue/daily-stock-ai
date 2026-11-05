@@ -10,12 +10,15 @@
 - volume 统一为**股**：mootdx vol 与东财"成交量"以手计，×100；新浪 volume 本身为股
 - amount 统一为**元**；新浪源无成交额字段，置 0
 - adj_factor 为**累计后复权因子**（上市以来 Π 除权除息调整比）
+
+⚠️ 缺陷 D-01 同类加固：价格/量额/复权因子一律走 safe_float，NaN/±Inf 不得进入
+stock_kline（MySQL 数值列会拒绝），价格缺失的行直接丢弃（宁缺毋错）。
 """
 import logging
 from datetime import date
 
 from app.collectors.base import BaseCollector
-from app.collectors.util import pick, to_date, to_records
+from app.collectors.util import pick, safe_float, to_date, to_records
 
 logger = logging.getLogger("app.collectors.kline")
 
@@ -46,16 +49,15 @@ def normalize_kline_rows(
         d = to_date(pick(row, _DATE_KEYS)) or to_date(row.get("date"))
         if d is None or d in seen:
             continue
-        try:
-            open_ = float(pick(row, _OPEN_KEYS))
-            high = float(pick(row, _HIGH_KEYS))
-            low = float(pick(row, _LOW_KEYS))
-            close = float(pick(row, _CLOSE_KEYS))
-        except (TypeError, ValueError):
-            continue  # 价格字段缺失/非法 → 丢弃该行
+        open_ = safe_float(pick(row, _OPEN_KEYS))
+        high = safe_float(pick(row, _HIGH_KEYS))
+        low = safe_float(pick(row, _LOW_KEYS))
+        close = safe_float(pick(row, _CLOSE_KEYS))
+        if None in (open_, high, low, close):
+            continue  # 价格字段缺失/非法/NaN → 丢弃该行
         seen.add(d)
-        volume = float(pick(row, _VOL_KEYS) or 0) * volume_scale
-        amount = float(pick(row, _AMT_KEYS) or 0)
+        volume = safe_float(pick(row, _VOL_KEYS), 0.0) * volume_scale
+        amount = safe_float(pick(row, _AMT_KEYS), 0.0)
         out.append(
             {
                 "code": code,
@@ -66,7 +68,7 @@ def normalize_kline_rows(
                 "close": close,
                 "volume": volume,
                 "amount": amount,
-                "adj_factor": float(adj_factors.get(d.isoformat(), 1.0)),
+                "adj_factor": safe_float(adj_factors.get(d.isoformat()), 1.0),
             }
         )
     out.sort(key=lambda r: r["date"])
@@ -90,11 +92,8 @@ def xdxr_to_adj_factors(
     closes: dict[str, float] = {}
     for row in bars_rows:
         d = to_date(pick(row, _DATE_KEYS)) or to_date(row.get("date"))
-        try:
-            c = float(pick(row, _CLOSE_KEYS))
-        except (TypeError, ValueError):
-            continue
-        if d is not None:
+        c = safe_float(pick(row, _CLOSE_KEYS))
+        if d is not None and c is not None:
             closes[d.isoformat()] = c
     closes.update(known_closes or {})
 
@@ -106,13 +105,10 @@ def xdxr_to_adj_factors(
         if None in (y, m, dd):
             continue
         event_date = to_date(f"{int(y):04d}-{int(m):02d}-{int(dd):02d}")
-        try:
-            fenhong = float(row.get("fenhong") or 0)
-            peigu = float(row.get("peigu") or 0)
-            peigujia = float(row.get("peigujia") or 0)
-            songzhuangu = float(row.get("songzhuangu") or 0)
-        except (TypeError, ValueError):
-            continue
+        fenhong = safe_float(row.get("fenhong"), 0.0)
+        peigu = safe_float(row.get("peigu"), 0.0)
+        peigujia = safe_float(row.get("peigujia"), 0.0)
+        songzhuangu = safe_float(row.get("songzhuangu"), 0.0)
         if event_date is None or (fenhong == 0 and peigu == 0 and songzhuangu == 0):
             continue
 
@@ -223,11 +219,8 @@ class AkshareSinaKlineCollector(BaseCollector):
         factors = {}
         for r in factor_rows:
             d = to_date(r.get("date"))
-            try:
-                f = float(r.get("hfq_factor"))
-            except (TypeError, ValueError):
-                continue
-            if d is not None:
+            f = safe_float(r.get("hfq_factor"))
+            if d is not None and f is not None:
                 factors[d.isoformat()] = f
         return normalize_kline_rows(raw, code, adj_factors=factors, volume_scale=1.0)
 
@@ -267,15 +260,13 @@ class AkshareEastsKlineCollector(BaseCollector):
         for r in raw:
             d = to_date(pick(r, _DATE_KEYS))
             if d is not None:
-                raw_close[d.isoformat()] = float(pick(r, _CLOSE_KEYS) or 0)
+                raw_close[d.isoformat()] = safe_float(pick(r, _CLOSE_KEYS), 0.0)
         for r in hfq:
             d = to_date(pick(r, _DATE_KEYS))
             if d is None:
                 continue
             base = raw_close.get(d.isoformat(), 0)
-            try:
-                if base > 0:
-                    factors[d.isoformat()] = float(pick(r, _CLOSE_KEYS)) / base
-            except (TypeError, ValueError):
-                continue
+            close = safe_float(pick(r, _CLOSE_KEYS))
+            if base and base > 0 and close is not None:
+                factors[d.isoformat()] = close / base
         return normalize_kline_rows(raw, code, adj_factors=factors, volume_scale=100.0)

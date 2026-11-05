@@ -21,7 +21,9 @@ const STATUS_TONE: Record<string, { color: string; label: string }> = {
   running: { color: 'processing', label: '运行中' },
   success: { color: 'success', label: '成功' },
   failed: { color: 'error', label: '失败' },
-  warning: { color: 'warning', label: '告警' },
+warning: { color: 'warning', label: '告警' },
+  // D-10 修复：任务被跳过的终态（如非交易日跳过报告生成）此前未登记，会显示为原始英文
+  skipped: { color: 'default', label: '已跳过' },
 }
 
 type CollectMode = 'incremental' | 'full' | 'single'
@@ -216,6 +218,8 @@ export default function TaskPage() {
               { value: 'success', label: '成功' },
               { value: 'failed', label: '失败' },
               { value: 'warning', label: '告警' },
+              // D-10 修复：补充 skipped 筛选项（与后端 status 白名单一致）
+              { value: 'skipped', label: '已跳过' },
             ]}
             onChange={(v) => {
               setPage(1)

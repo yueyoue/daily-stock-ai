@@ -52,6 +52,12 @@ class InterfacePatch(BaseModel):
     enabled: bool | None = None
 
 
+class InterfaceTestIn(BaseModel):
+    """连通性测试可选样例参数（D-08）：kline/finance/research_report 等需补参的数据源。"""
+
+    params: dict = Field(default_factory=dict)
+
+
 def _view(row: DataSourceConfig) -> dict:
     return {
         "id": row.id, "data_type": row.data_type, "name": row.name,
@@ -103,9 +109,16 @@ def interfaces_delete(source_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/interfaces/{source_id}/test")
-def interfaces_test(source_id: int, db: Session = Depends(get_db)):
-    """连通性测试：试采 1 次，返回结果与耗时（设置页"测试"按钮）。"""
-    return probe_source(db, source_id)
+def interfaces_test(source_id: int, payload: InterfaceTestIn | None = None,
+                    db: Session = Depends(get_db)):
+    """连通性测试：试采 1 次，返回结果与耗时（设置页"测试"按钮）。
+
+    D-08：kline/finance/research_report 等数据源必须带业务参数（如 code）才能试采，
+    因此接受可选的样例参数 body（{"params": {...}}），与数据源的 params_template 合并
+    （调用方传参优先）。不传 body 时保持原有行为（仅用 params_template），向后兼容。
+    """
+    params = payload.params if payload else None
+    return probe_source(db, source_id, params=params)
 
 
 @router.get("/status")

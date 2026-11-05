@@ -2,7 +2,7 @@
 
 - list / detail：历史报告查询
 - regenerate：数据 → LLM → Markdown → 校验重试 → 入库（覆盖 + version+1）；
-  响应带 ok/attempts/fallback/problems，便于前端提示生成质量与降级状态
+  响应带 ok/attempts/fallback/fallback_reason/problems，便于前端提示生成质量与降级原因
 """
 from datetime import date
 
@@ -53,6 +53,8 @@ class RegenerateResponse(BaseModel):
     ok: bool = True
     attempts: int = 0
     fallback: bool = False
+    # D-14 修复：降级（LLM 未就绪落结构化骨架）时回传具体原因，前端可如实提示
+    fallback_reason: str = ""
     llm_used: bool = False
     problems: list[str] = []
 
@@ -91,5 +93,6 @@ def report_regenerate(payload: RegenerateRequest, db: Session = Depends(get_db))
         "version": row.version,
         "generated_at": row.generated_at.isoformat() if row.generated_at else None,
         "ok": res["ok"], "attempts": res["attempts"], "fallback": res["fallback"],
+        "fallback_reason": res.get("fallback_reason") or "",
         "llm_used": res["llm_used"], "problems": res["problems"],
     }

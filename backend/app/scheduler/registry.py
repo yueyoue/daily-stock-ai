@@ -23,6 +23,7 @@ import logging
 from datetime import date, datetime
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -193,17 +194,23 @@ def build_scheduler(db: Session) -> BackgroundScheduler:
             logger.info("跳过已关闭任务: %s", spec["name"])
             continue
         cron = _resolve_cron(db, spec)
-        parts = cron.split()
-        if len(parts) != 5:
-            logger.error("cron 非法，跳过任务 %s: %r", spec["name"], cron)
+        # D-06 容错降级：单个任务的 cron 非法只跳过该任务，不让应用启动失败。
+        # 这里用 CronTrigger.from_crontab 做最终校验（与 config_store._check_cron 同一判据）。
+        try:
+            trigger = CronTrigger.from_crontab(cron, timezone=get_settings().timezone)
+        except (ValueError, TypeError) as exc:
+            logger.error("cron 非法，跳过任务 %s: %r (%s)", spec["name"], cron, exc)
             continue
-        scheduler.add_job(
-            functools.partial(run_job, spec),
-            trigger="cron",
-            minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4],
-            id=spec["name"],
-            replace_existing=True,
-        )
+        try:
+            scheduler.add_job(
+                functools.partial(run_job, spec),
+                trigger=trigger,
+                id=spec["name"],
+                replace_existing=True,
+            )
+        except Exception as exc:  # noqa: BLE001 - 注册失败不应拖垮启动
+            logger.error("注册定时任务失败，跳过 %s: %s", spec["name"], exc)
+            continue
         logger.info("注册定时任务 %s cron=%s trading_only=%s",
                     spec["name"], cron, spec.get("trading_only", False))
     return scheduler

@@ -29,6 +29,15 @@ def _fetch_wencai(query: str, cookie: str) -> list[dict]:
         raise RuntimeError(f"pywencai 未安装或版本不符（要求 ==0.12.2）: {e}") from e
     try:
         result = pywencai.get(query=query, cookie=cookie or None, loop=True)
+    except AttributeError as e:
+        # D-05 修复：问财接口层不可达/改版时，pywencai 对 None 取属性会抛
+        # AttributeError（'NoneType' object has no attribute 'get'），
+        # 与 cookie 失效无关，需给出可区分的排障提示。
+        raise RuntimeError(
+            "问财接口无返回（疑似接口改版或网络不可达，非 cookie 问题）："
+            f"{e}；请检查到 x.iwencai.com 的连通性、或升级/锁定 pywencai 版本，"
+            "必要时改用同数据类型的备源接口"
+        ) from e
     except Exception as e:
         raise RuntimeError(f"问财请求失败（疑似 cookie 失效或风控）: {e}") from e
     if result is None:

@@ -1,6 +1,6 @@
 """系统配置接口（T3.5，开发文档 §7：GET /api/config/get、POST /api/config/save）。"""
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.models.base import get_db
@@ -11,7 +11,13 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 
 class ConfigUpdate(BaseModel):
-    """全部可选：只提交要改的项。llm_api_key 只进不出，空值视为不修改。"""
+    """全部可选：只提交要改的项。llm_api_key 只进不出，空值视为不修改。
+
+    D-07 修复：extra="forbid" —— 提交未知配置项直接报参数校验错误（400），
+    不再被 pydantic 静默丢弃后变成"空操作"却返回 200。
+    """
+
+    model_config = ConfigDict(extra="forbid")
 
     tech_indicator_store: bool | None = None
     indicator_cache_days: int | None = None

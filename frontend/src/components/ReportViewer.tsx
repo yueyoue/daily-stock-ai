@@ -73,6 +73,8 @@ const regenerate = async () => {
         ok: boolean
         attempts: number
         fallback: boolean
+        /** D-14：LLM 未就绪降级时回传的具体原因 */
+        fallback_reason?: string
         llm_used: boolean
         problems: string[]
       }>('/api/report/regenerate', {
@@ -81,7 +83,12 @@ const regenerate = async () => {
       })
       // T7.6：把生成质量如实反馈给用户（降级骨架 / 校验问题 / LLM 尝试次数）
       if (r.fallback) {
-        message.warning('已生成结构化骨架（LLM 未就绪，配置 Key 后可重新生成）')
+        // D-14 修复：附上降级原因，避免只提示「已降级」而不知为何降级
+        message.warning(
+          `已生成结构化骨架（LLM 未就绪，配置 Key 后可重新生成）${
+            r.fallback_reason ? `：${r.fallback_reason}` : ''
+          }`,
+        )
       } else if (r.problems && r.problems.length > 0) {
         message.warning(`已生成，但存在待人工复核项：${r.problems.join('；')}`)
       } else {
@@ -146,7 +153,7 @@ const regenerate = async () => {
                 }}
               />
             )}
-<Button
+            <Button
               block
               style={{ marginTop: 12, borderColor: '#2563eb', color: '#2563eb' }}
               loading={regenerating}
@@ -171,7 +178,7 @@ const regenerate = async () => {
               </Space>
             }
           >
-{selected ? (
+            {selected ? (
               <div className="md-body">
                 {/* T7.6：展示生成时间与版本，便于核对定时任务产出 */}
                 <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 12 }}>

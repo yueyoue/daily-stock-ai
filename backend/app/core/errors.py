@@ -17,6 +17,7 @@ ERROR_CODES: dict[int, str] = {
     401: "未登录或会话过期",
     403: "无权限",
     404: "资源不存在",
+    405: "方法不允许",
     409: "状态冲突（重复提交等）",
     429: "请求过于频繁/登录锁定",
     500: "服务器内部错误",
@@ -35,9 +36,11 @@ class AppError(Exception):
         super().__init__(message)
 
 
-def _envelope(code: int, message: str) -> JSONResponse:
+def _envelope(code: int, message: str, headers: dict | None = None) -> JSONResponse:
+    # D-09：透传 HTTPException 自带的响应头（如 405 必须携带的 Allow，RFC 7231 §6.5.5）
     return JSONResponse(status_code=code if 400 <= code < 600 else 400,
-                        content={"code": code, "message": message})
+                        content={"code": code, "message": message},
+                        headers=headers)
 
 
 def install_error_handlers(app: FastAPI) -> None:
@@ -48,7 +51,8 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def on_http_error(request: Request, exc: StarletteHTTPException):
         # 挂 Starlette 基类：连 FastAPI 默认 404（detail 信封）也统一为 {code,message}
-        return _envelope(exc.status_code, str(exc.detail))
+        # D-09：一并透传 exc.headers，保留 405 的 Allow 头
+        return _envelope(exc.status_code, str(exc.detail), headers=getattr(exc, "headers", None))
 
     @app.exception_handler(RequestValidationError)
     async def on_validation_error(request: Request, exc: RequestValidationError):

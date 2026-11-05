@@ -3,12 +3,25 @@
 涨跌家数 / 情绪原始分项（供 T7.3 情绪规则化打分取原始项）：
 - 主源：东财全市场快照（stock_zh_a_spot_em）统计上涨/下跌/平盘、总成交额
 - 备源：乐咕市场活跃度（stock_market_activity_legu）直接给家数
+
+⚠️ 缺陷 D-01 修复：pandas 的 NaN 不会被 float() 抛错，直接累加会把 NaN
+带进 extra（写 MySQL JSON 列报 3140）。此处一律走 safe_float/safe_int，
+并把 extra 做 json_safe 清洗；快照中缺失涨跌幅的行（停牌等）不计入家数。
 """
 import logging
 from datetime import date as date_type
 
 from app.collectors.base import BaseCollector
-from app.collectors.util import pick, to_date, to_records, to_records_indexed
+from app.collectors.util import (
+    is_bad_number,
+    json_safe,
+    pick,
+    safe_float,
+    safe_int,
+    to_date,
+    to_records,
+    to_records_indexed,
+)
 
 logger = logging.getLogger("app.collectors.market")
 
@@ -35,9 +48,8 @@ class AkshareEastsSpotSummaryCollector(BaseCollector):
         up = down = flat = 0
         turnover = 0.0
         for row in rows:
-            try:
-                pct = float(pick(row, _PCT_KEYS) or 0)
-            except ValueError:
+            pct = safe_float(pick(row, _PCT_KEYS))
+            if pct is None:  # 停牌/缺失涨跌幅：不计入涨跌家数
                 continue
             if pct > 0:
                 up += 1
@@ -45,13 +57,12 @@ class AkshareEastsSpotSummaryCollector(BaseCollector):
                 down += 1
             else:
                 flat += 1
-            try:
-                turnover += float(pick(row, _AMT_KEYS) or 0)
-            except ValueError:
-                continue
+            amount = safe_float(pick(row, _AMT_KEYS))
+            if amount is not None:
+                turnover += amount
         return [{"date": run_date, "up_count": up, "down_count": down,
-                 "extra": {"flat_count": flat, "turnover_amount": turnover,
-                           "样本数": len(rows)}}]
+                 "extra": json_safe({"flat_count": flat, "turnover_amount": turnover,
+                                     "样本数": len(rows)})}]
 
 
 class AkshareLeguActivityCollector(BaseCollector):
@@ -77,16 +88,20 @@ class AkshareLeguActivityCollector(BaseCollector):
 
         extra = {}
         for key in ("赚钱效应", "真实涨跌比"):
-            value = pick(row, (key,))
-            if value:
-                try:
-                    extra[key] = float(value)
-                except ValueError:
-                    extra[key] = value
+            raw = pick(row, (key,))
+            if not raw:
+                continue
+            value = safe_float(raw)
+            if value is not None:
+                extra[key] = value
+            elif not is_bad_number(raw):  # "nan"/"inf" 等脏值丢弃，不留进 JSON
+                extra[key] = raw
+        flat_raw = pick(row, _FLAT_KEYS)
+        if flat_raw:
+            extra["flat_count"] = safe_int(flat_raw, 0)
         return [{
             "date": to_date(pick(row, _DATE_KEYS)) or run_date,
-            "up_count": int(float(pick(row, _UP_KEYS) or 0)),
-            "down_count": int(float(pick(row, _DOWN_KEYS) or 0)),
-            "extra": extra | ({"flat_count": int(float(pick(row, _FLAT_KEYS) or 0))}
-                              if pick(row, _FLAT_KEYS) else {}),
+            "up_count": safe_int(pick(row, _UP_KEYS), 0),
+            "down_count": safe_int(pick(row, _DOWN_KEYS), 0),
+            "extra": json_safe(extra),
         }]

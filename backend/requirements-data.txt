@@ -4,7 +4,7 @@ pandas>=2.2
 numpy>=1.26
 pyarrow>=15
 requests>=2.31
-akshare>=1.14
+akshare==1.20.27
 mootdx>=0.7
 easyquotation>=0.6
 pywencai==0.12.2

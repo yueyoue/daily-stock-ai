@@ -200,7 +200,7 @@ INITIAL_SOURCES: list[dict] = [
         "timeout_sec": 600,
     },
     # T6.4 问财线（§2.3.3 风险源：cookie/Node.js/版本锁；query/cookie 在设置页配置）
-    {
+{
         "data_type": "stock_select",
         "name": "pywencai问财条件选股",
         "impl_kind": "py_func",
@@ -210,6 +210,19 @@ INITIAL_SOURCES: list[dict] = [
         "priority": 1,
         "qps_limit": 0.5,
         "timeout_sec": 120,
+    },
+    # D-05 修复：问财通道在部分网络环境不可达，stock_select 线补自有备源
+    # （akshare 全市场快照本地筛选，不依赖第三方语义接口）
+    {
+        "data_type": "stock_select",
+        "name": "akshare-全市场快照本地筛选(备用)",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.spot_select:AkshareSpotSelectCollector",
+        "params_template": {"top_n": 100, "exclude_st": True},
+        "role": "备用",
+        "priority": 2,
+        "qps_limit": 1.0,
+        "timeout_sec": 60,
     },
     {
         "data_type": "research_report",

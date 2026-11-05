@@ -55,7 +55,7 @@ class FakeIndexedRows:
 
 def test_moneyflow_market_collector_filters_by_date(monkeypatch):
     stub = types.ModuleType("akshare")
-    stub.stock_fund_flow_market = lambda symbol: FakeIndexedRows(
+    stub.stock_market_fund_flow = lambda: FakeIndexedRows(
         [{"主力净流入-净额": 999}],  # 索引布局：records 无日期列
         indexed_rows=[{"日期": "2026-11-02", "主力净流入-净额": 888},
                       {"日期": "2026-11-03", "主力净流入-净额": 123.4,

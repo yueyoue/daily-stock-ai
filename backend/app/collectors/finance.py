@@ -7,11 +7,14 @@
 
 关键科目（落列）：营收/净利/经营现金流/总资产/总负债/权益/EPS；
 三表其余非空科目进 extra JSON（供 T2.1 财务指标 30 项计算，白名单外丢弃控制体积）。
+
+⚠️ 缺陷 D-01 同类加固：所有数值取值统一走 safe_float，NaN/±Inf/空串一律归一为 None，
+杜绝非标准 JSON 的 NaN 进入 stock_finance（Float 列）与 extra（JSON 列）。
 """
 import logging
 
 from app.collectors.base import BaseCollector
-from app.collectors.util import pick, to_date, to_records
+from app.collectors.util import is_bad_number, pick, safe_float, to_date, to_records
 
 logger = logging.getLogger("app.collectors.finance")
 
@@ -35,10 +38,8 @@ EXTRA_MAX_FIELDS = 200  # extra JSON 体积护栏（每股×报告期）
 
 
 def _to_float(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
+    """数值归一：NaN/±Inf/空串/"--" 等一律返回 None（委托 util.safe_float）。"""
+    return safe_float(value)
 
 
 def merge_statement_rows(sheets: dict[str, list[dict]]) -> list[dict]:
@@ -63,12 +64,19 @@ def merge_statement_rows(sheets: dict[str, list[dict]]) -> list[dict]:
         slot = merged[d]
         rec: dict = {"report_date": d, "report_type": "quarterly"}
         for field, aliases in FIELD_ALIASES.items():
-            rec[field] = _to_float(pick(slot, aliases)) if pick(slot, aliases) else None
-        extra = {
-            k: (_to_float(v) if _to_float(v) is not None else str(v)[:64])
-            for k, v in slot.items()
-            if k not in _DATE_KEYS
-        }
+            raw = pick(slot, aliases)
+            rec[field] = safe_float(raw) if raw not in (None, "") else None
+        extra: dict = {}
+        for k, v in slot.items():
+            if k in _DATE_KEYS:
+                continue
+            num = safe_float(v)
+            if num is not None:
+                extra[k] = num
+                continue
+            text = str(v).strip()
+            if text and not is_bad_number(v):
+                extra[k] = text[:64]
         rec["extra"] = dict(list(extra.items())[:EXTRA_MAX_FIELDS])
         out.append(rec)
     return out
