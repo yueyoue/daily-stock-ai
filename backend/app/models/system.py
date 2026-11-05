@@ -95,7 +95,7 @@ class TaskLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     task_name: Mapped[str] = mapped_column(String(64), index=True)
-    status: Mapped[str] = mapped_column(String(16), index=True)  # running / success / failed
+    status: Mapped[str] = mapped_column(String(16), index=True)  # running / success / failed / warning / skipped
     duration_ms: Mapped[int] = mapped_column(Integer, default=0)
     message: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)

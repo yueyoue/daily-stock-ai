@@ -105,7 +105,7 @@ def test_job_specs_resolve_cron_from_config():
         _clean(db)
         specs = {s["name"]: s for s in get_job_specs(db)}
         assert specs["build_indicator_cache"]["cron"] == "0 16 * * 1-5"
-        assert specs["report_morning"]["enabled"] is False   # T7.5 待接线
+        assert specs["report_morning"]["enabled"] is True    # T7.5 已接线（开关走配置）
         assert specs["report_morning"]["cron"] == "0 8 * * 1-5"
 
         # 配置页改 cron → 注册表解析立即生效

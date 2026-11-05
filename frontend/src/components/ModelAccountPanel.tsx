@@ -1,15 +1,44 @@
-import { Button, Card, Divider, Input, Space, Typography, message } from 'antd'
+import { Button, Card, Divider, Input, Space, Switch, Typography, message } from 'antd'
 import { useEffect, useState } from 'react'
 import { authApi, configApi } from '../api/client'
 
-/** 模型 / 账号 / 定时任务（T4.9）：LLM 切换+Key 遮蔽+连通测试、修改密码、报告定时 */
+/** 模型 / 账号 / 定时任务（T4.9 + T7.5）：LLM 切换+Key 遮蔽+连通测试、修改密码、报告与采集定时/开关 */
+
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+  hint,
+}: {
+  label: string
+  checked: boolean
+  onChange: (v: boolean) => void
+  hint?: string
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <Switch checked={checked} onChange={onChange} />
+      <span style={{ fontSize: 13 }}>{label}</span>
+      {hint ? <span style={{ fontSize: 12, opacity: 0.6 }}>{hint}</span> : null}
+    </div>
+  )
+}
 
 export default function ModelAccountPanel() {
   const [llmModel, setLlmModel] = useState('')
   const [llmKey, setLlmKey] = useState('') // 只进不出：留空=不修改
   const [keyMasked, setKeyMasked] = useState('')
+
+  // 定时任务（T7.5）：报告/采集时间与开关
   const [amCron, setAmCron] = useState('')
   const [pmCron, setPmCron] = useState('')
+  const [collectAmCron, setCollectAmCron] = useState('')
+  const [collectPmCron, setCollectPmCron] = useState('')
+  const [reportAmOn, setReportAmOn] = useState(true)
+  const [reportPmOn, setReportPmOn] = useState(true)
+  const [collectAmOn, setCollectAmOn] = useState(true)
+  const [collectPmOn, setCollectPmOn] = useState(true)
+
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
 
@@ -24,6 +53,12 @@ export default function ModelAccountPanel() {
       setLlmModel(c.llm_model)
       setAmCron(c.report_am_cron)
       setPmCron(c.report_pm_cron)
+      setCollectAmCron(c.collect_am_cron)
+      setCollectPmCron(c.collect_pm_cron)
+      setReportAmOn(c.report_am_enabled)
+      setReportPmOn(c.report_pm_enabled)
+      setCollectAmOn(c.collect_am_enabled)
+      setCollectPmOn(c.collect_pm_enabled)
       setKeyMasked(c.llm_api_key_masked)
       setLlmKey('') // 保存后清空输入框，永不回显明文
     } catch (e) {
@@ -42,10 +77,16 @@ export default function ModelAccountPanel() {
         llm_model: llmModel,
         report_am_cron: amCron,
         report_pm_cron: pmCron,
+        collect_am_cron: collectAmCron,
+        collect_pm_cron: collectPmCron,
+        report_am_enabled: reportAmOn,
+        report_pm_enabled: reportPmOn,
+        collect_am_enabled: collectAmOn,
+        collect_pm_enabled: collectPmOn,
       }
       if (llmKey.trim()) payload.llm_api_key = llmKey.trim() // 空=不修改
       await configApi.save(payload)
-      message.success('已保存')
+      message.success('已保存（开关立即生效，cron 时间下次启动调度器时生效）')
       await reload()
     } catch (e) {
       message.error(e instanceof Error ? e.message : '保存失败')
@@ -118,17 +159,30 @@ export default function ModelAccountPanel() {
 
         <Divider style={{ margin: '8px 0' }} />
 
-        {/* 定时任务 */}
+        {/* 定时任务（T7.5，开发文档 §4.9） */}
         <div>
           <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>盘前早报定时（cron）</div>
           <Input value={amCron} onChange={(e) => setAmCron(e.target.value)} placeholder="0 8 * * 1-5" />
         </div>
+        <ToggleRow label="启用盘前早报" checked={reportAmOn} onChange={setReportAmOn} hint="交易日 08:00" />
         <div>
           <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>盘后复盘定时（cron）</div>
           <Input value={pmCron} onChange={(e) => setPmCron(e.target.value)} placeholder="0 17 * * 1-5" />
         </div>
+        <ToggleRow label="启用盘后复盘" checked={reportPmOn} onChange={setReportPmOn} hint="交易日 17:00" />
+        <div>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>隔夜资讯采集定时（cron）</div>
+          <Input value={collectAmCron} onChange={(e) => setCollectAmCron(e.target.value)} placeholder="30 7 * * *" />
+        </div>
+        <ToggleRow label="启用隔夜资讯采集" checked={collectAmOn} onChange={setCollectAmOn} hint="每日 07:30，非交易日仍抓" />
+        <div>
+          <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>收盘数据采集定时（cron）</div>
+          <Input value={collectPmCron} onChange={(e) => setCollectPmCron(e.target.value)} placeholder="30 15 * * 1-5" />
+        </div>
+        <ToggleRow label="启用收盘数据采集" checked={collectPmOn} onChange={setCollectPmOn} hint="交易日 15:30 → 16:00 指标缓存" />
         <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 0 }}>
-          cron 格式：分 时 星期…（默认 0 8 * * 1-5 = 交易日早 8 点）；交易日判断由调度器按交易日历前置过滤。
+          cron 格式：分 时 日 月 周（默认 0 8 * * 1-5 = 交易日早 8 点）；交易日判断由调度器按交易日历前置过滤，
+          非交易日不生成报告（只跑资讯线）。时区固定 Asia/Shanghai。
         </Typography.Paragraph>
         <Button type="primary" loading={saving} onClick={() => void save()}>
           保存模型与定时配置

@@ -57,8 +57,15 @@ export interface AppConfig {
   tech_indicator_store: boolean
   indicator_cache_days: number
   indicator_engine: string
-  report_am_cron: string
+report_am_cron: string
   report_pm_cron: string
+  // T7.5 定时调度：采集线时间 + 四类任务开关
+  collect_am_cron: string
+  collect_pm_cron: string
+  collect_am_enabled: boolean
+  collect_pm_enabled: boolean
+  report_am_enabled: boolean
+  report_pm_enabled: boolean
   llm_model: string
   llm_api_key_masked: string
 }

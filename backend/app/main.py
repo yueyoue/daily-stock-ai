@@ -1,4 +1,5 @@
 """DailyStockAI 后端入口（开发文档 §2.1：单镜像由 FastAPI 托管前端产物）。"""
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from app.core.logging import setup_logging
 from app.services.source_seed import seed_data_sources
 
 setup_logging()
+logger = logging.getLogger("app.main")
 settings = get_settings()
 
 
@@ -36,12 +38,29 @@ async def lifespan(app: FastAPI):
 
     init_db()
     db = SessionLocal()
+    scheduler = None
     try:
         seed_admin(db)
         seed_data_sources(db)
+        # T7.5 定时调度：TZ 自检 → 装配注册表 → 启动（起停随 lifespan）
+        if settings.scheduler_enabled:
+            from app.scheduler.registry import build_scheduler, tz_selfcheck
+
+            tz_selfcheck()
+            scheduler = build_scheduler(db)
+            scheduler.start()
+            app.state.scheduler = scheduler
+            logger.info("定时调度已启动（TZ=%s，§4.9）", settings.timezone)
+        else:
+            logger.warning("定时调度未启用（SCHEDULER_ENABLED=false）")
     finally:
         db.close()
-    yield
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
+            logger.info("定时调度已停止")
 
 
 app = FastAPI(

@@ -18,6 +18,13 @@ class ConfigUpdate(BaseModel):
     indicator_engine: str | None = None
     report_am_cron: str | None = None
     report_pm_cron: str | None = None
+    # T7.5 定时调度：采集线时间 + 四类任务开关
+    collect_am_cron: str | None = None
+    collect_pm_cron: str | None = None
+    collect_am_enabled: bool | None = None
+    collect_pm_enabled: bool | None = None
+    report_am_enabled: bool | None = None
+    report_pm_enabled: bool | None = None
     llm_model: str | None = None
     llm_api_key: str | None = None
 

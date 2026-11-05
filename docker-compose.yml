@@ -22,8 +22,16 @@ services:
       REDIS_URL: redis://redis:6379/0        # 未启用 redis profile 时忽略
       LLM_API_KEY: ${LLM_API_KEY}
       LLM_MODEL: ${LLM_MODEL:-qwen-plus}
+# T7.5 定时调度（§4.9）：时间与开关均可经 .env 覆盖
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       REPORT_AM_CRON: ${REPORT_AM_CRON:-0 8 * * 1-5}
       REPORT_PM_CRON: ${REPORT_PM_CRON:-0 17 * * 1-5}
+      REPORT_AM_ENABLED: ${REPORT_AM_ENABLED:-true}
+      REPORT_PM_ENABLED: ${REPORT_PM_ENABLED:-true}
+      COLLECT_AM_CRON: ${COLLECT_AM_CRON:-30 7 * * *}
+      COLLECT_PM_CRON: ${COLLECT_PM_CRON:-30 15 * * 1-5}
+      COLLECT_AM_ENABLED: ${COLLECT_AM_ENABLED:-true}
+      COLLECT_PM_ENABLED: ${COLLECT_PM_ENABLED:-true}
     volumes:
       - ./data:/app/data       # Parquet 指标缓存、导出文件等；飞牛建议整个部署目录放 /vol1/docker/daily-stock-ai/
     depends_on:

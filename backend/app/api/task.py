@@ -31,7 +31,9 @@ class TaskPage(BaseModel):
 @router.get("/status", response_model=TaskPage)
 def task_status(
     keyword: str | None = Query(None, description="任务名模糊匹配"),
-    status: str | None = Query(None, description="running/success/failed/warning"),
+    status: str | None = Query(
+        None, description="running/success/failed/warning/skipped"
+    ),
     page: Pagination = Depends(get_pagination),
     db: Session = Depends(get_db),
 ):

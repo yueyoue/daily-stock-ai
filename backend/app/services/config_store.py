@@ -20,6 +20,13 @@ CONFIG_SPEC: dict[str, dict] = {
     "indicator_engine": {"type": str, "default": "talib", "choices": ["talib", "pandas"]},
     "report_am_cron": {"type": str, "default": "0 8 * * 1-5", "cron": True},
     "report_pm_cron": {"type": str, "default": "0 17 * * 1-5", "cron": True},
+    # T7.5 定时调度：采集线时间与四类任务开关（交易日前置判断在调度层 registry.run_job）
+    "collect_am_cron": {"type": str, "default": "30 7 * * *", "cron": True},
+    "collect_pm_cron": {"type": str, "default": "30 15 * * 1-5", "cron": True},
+    "collect_am_enabled": {"type": bool, "default": True},
+    "collect_pm_enabled": {"type": bool, "default": True},
+    "report_am_enabled": {"type": bool, "default": True},
+    "report_pm_enabled": {"type": bool, "default": True},
     "llm_model": {"type": str, "default": "qwen-plus"},
     "llm_api_key": {"type": str, "default": "", "secret": True},
 }

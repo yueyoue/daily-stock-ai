@@ -30,8 +30,16 @@ class Settings(BaseSettings):
     llm_model: str = "qwen-plus"
 
     # 定时任务（开发文档 §4.9，时区固定 Asia/Shanghai）
-    report_am_cron: str = "0 8 * * 1-5"
-    report_pm_cron: str = "0 17 * * 1-5"
+    # scheduler_enabled=False 可整体关闭进程内调度器（测试/手工补跑场景）
+    scheduler_enabled: bool = True
+    report_am_cron: str = "0 8 * * 1-5"       # 盘前早报（交易日 08:00）
+    report_pm_cron: str = "0 17 * * 1-5"      # 盘后复盘（交易日 17:00）
+    collect_am_cron: str = "30 7 * * *"       # 隔夜资讯（每日 07:30，非交易日仍抓）
+    collect_pm_cron: str = "30 15 * * 1-5"    # 收盘采集（交易日 15:30）
+    collect_am_enabled: bool = True
+    collect_pm_enabled: bool = True
+    report_am_enabled: bool = True
+    report_pm_enabled: bool = True
 
     # 指标计算（开发文档 §5.4：TA-Lib 主引擎 / pandas 降级）
     indicator_engine: str = "talib"  # talib | pandas
