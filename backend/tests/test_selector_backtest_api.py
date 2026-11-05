@@ -118,7 +118,9 @@ def test_backtest_run_state_machine(client):
         _login(client)
         r = client.post("/api/backtest/run", json={
             "start_date": "2025-01-01", "end_date": "2026-01-01",
-            "initial_capital": 100000, "fee_rate": 0.0005, "slippage": 0.001})
+            "initial_capital": 100000, "fee_rate": 0.0005, "slippage": 0.001,
+            "conditions": {"logic": "and", "conditions": [
+                {"factor": "ma5", "op": ">", "value": 0.0}]}})
         assert r.status_code == 200
         assert r.json()["status"] == "queued"  # 入队即返回（异步执行）
         bt_id = r.json()["id"]
@@ -126,9 +128,9 @@ def test_backtest_run_state_machine(client):
         # 后台任务完成后 → success（TestClient 在响应后执行 background）
         st = client.get(f"/api/backtest/{bt_id}").json()
         assert st["status"] == "success"
-        assert st["result"]["risk_notice"] and st["result"]["engine"] == "skeleton"
-        assert set(st["result"]) >= {"equity_curve", "win_rate", "profit_loss_ratio",
-                                     "max_drawdown", "trades"}
+        assert st["result"]["risk_notice"] and st["result"]["engine"] == "t5.6"
+        assert set(st["result"]) >= {"equity_curve", "trades", "events",
+                                     "final_equity", "win_rate", "max_drawdown"}
 
         assert client.get("/api/backtest/9999").json()["code"] == 404
     finally:
@@ -157,8 +159,10 @@ def test_backtest_failure_marks_failed_with_reason(monkeypatch):
     db = SessionLocal()
     try:
         _clean(db)
-        row = bt.submit_backtest(db, start_date=date(2025, 1, 1),
-                                 end_date=date(2026, 1, 1))
+        row = bt.submit_backtest(
+            db, start_date=date(2025, 1, 1), end_date=date(2026, 1, 1),
+            params={"conditions": {"logic": "and", "conditions": [
+                {"factor": "ma5", "op": ">", "value": 0.0}]}})
         assert row.status == "queued"
 
         seen = {}

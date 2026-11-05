@@ -21,8 +21,11 @@ class BacktestRunRequest(BaseModel):
     end_date: date
     initial_capital: float = Field(100000, gt=0)
     strategy_id: int | None = None
+    conditions: dict | None = Field(None, description="选股条件 DSL（ScanSpec JSON）；与 strategy_id 二选一")
     fee_rate: float = Field(0.0005, ge=0)
     slippage: float = Field(0.001, ge=0)
+    limit_pct: float = Field(0.10, gt=0, lt=1, description="涨跌停幅度（简化口径，默认 ±10%）")
+    max_positions: int = Field(5, ge=1, le=20)
 
 
 class BacktestStatus(BaseModel):
@@ -43,7 +46,10 @@ def backtest_run(payload: BacktestRunRequest, background: BackgroundTasks,
         db, start_date=payload.start_date, end_date=payload.end_date,
         initial_capital=payload.initial_capital,
         strategy_id=payload.strategy_id,
-        params={"fee_rate": payload.fee_rate, "slippage": payload.slippage},
+        params={"fee_rate": payload.fee_rate, "slippage": payload.slippage,
+                "limit_pct": payload.limit_pct,
+                "max_positions": payload.max_positions,
+                "conditions": payload.conditions},
     )
     background.add_task(run_backtest, row.id)  # 异步执行，立即返回
     return {

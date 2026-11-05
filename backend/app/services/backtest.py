@@ -47,16 +47,50 @@ def submit_backtest(db: Session, *, start_date: date, end_date: date,
 
 
 def _engine(row: BacktestRecord) -> dict:
-    """回测引擎骨架（T5.5 口径四件套 / T5.6 撮合 / T5.7 统计接入后替换）。"""
-    return {
-        "engine": "skeleton",
-        "equity_curve": [],
-        "win_rate": None,
-        "profit_loss_ratio": None,
-        "max_drawdown": None,
-        "trades": [],
-        "risk_notice": "回测基于历史数据模拟，不代表未来收益",
-    }
+    """回测引擎（T5.5 数据口径 + T5.6 撮合与组合；统计指标 T5.7 接入）。"""
+    from app.models.system import StockStrategy
+    from app.services.backtest_data import load_universe_series
+    from app.services.backtest_engine import TradeRules, simulate
+    from app.services.backtest_signals import build_candidate_fn
+
+    params = row.params or {}
+    db = SessionLocal()
+    try:
+        spec_raw = params.get("conditions")
+        if not spec_raw and row.strategy_id is not None:
+            strat = db.get(StockStrategy, row.strategy_id)
+            if strat is None:
+                raise ValueError(f"选股策略 {row.strategy_id} 不存在")
+            spec_raw = strat.conditions or {}
+        if not spec_raw:
+            raise ValueError("缺少选股策略条件（strategy_id 或 params.conditions）")
+
+        data, skipped = load_universe_series(db, row.start_date, row.end_date)
+        candidate_fn = build_candidate_fn(db, spec_raw, data)
+        rules = TradeRules(
+            slippage=float(params.get("slippage", 0.001)),
+            fee_rate=float(params.get("fee_rate", 0.0005)),
+            limit_pct=float(params.get("limit_pct", 0.10)),
+            max_positions=int(params.get("max_positions", 5)),
+        )
+        out = simulate(data, candidate_fn, row.start_date, row.end_date,
+                       row.initial_capital, rules)
+        return {
+            "engine": "t5.6",
+            "equity_curve": out["equity_curve"],
+            "trades": out["trades"],
+            "events": out["events"],
+            "final_equity": out["final_equity"],
+            "open_orders": out["open_orders"],
+            "skipped_codes": skipped,
+            "rules": {"slippage": rules.slippage, "fee_rate": rules.fee_rate,
+                      "limit_pct": rules.limit_pct,
+                      "max_positions": rules.max_positions},
+            "win_rate": None, "profit_loss_ratio": None, "max_drawdown": None,
+            "risk_notice": "回测基于历史数据模拟，不代表未来收益",
+        }
+    finally:
+        db.close()
 
 
 def run_backtest(record_id: int) -> None:
