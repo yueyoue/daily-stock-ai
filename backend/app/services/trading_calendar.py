@@ -21,6 +21,19 @@ def is_trading_day(db: Session, day: date) -> bool:
     return day.weekday() < 5
 
 
+def previous_trading_day(db: Session, day: date, max_back: int = 20) -> date:
+    """上一个交易日（用于隔夜资讯/大盘/资金取数的基准日）。"""
+    from datetime import timedelta
+
+    cur = day - timedelta(days=1)
+    for _ in range(max_back):
+        if is_trading_day(db, cur):
+            return cur
+        cur = cur - timedelta(days=1)
+    logger.warning("回溯 %d 天未找到交易日（基准 %s），按前一日返回", max_back, day.isoformat())
+    return day - timedelta(days=1)
+
+
 def upsert_calendar(db: Session, entries: list[dict]) -> int:
     """批量写入日历。entries: [{"date": date|str, "is_trading_day": bool}, ...]"""
     count = 0
