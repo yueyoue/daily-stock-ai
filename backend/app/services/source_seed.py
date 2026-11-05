@@ -199,6 +199,40 @@ INITIAL_SOURCES: list[dict] = [
         "qps_limit": 0.5,
         "timeout_sec": 600,
     },
+    # T6.4 问财线（§2.3.3 风险源：cookie/Node.js/版本锁；query/cookie 在设置页配置）
+    {
+        "data_type": "stock_select",
+        "name": "pywencai问财条件选股",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.wencai:PywencaiCollector",
+        "params_template": {"query": "非st", "cookie": ""},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 0.5,
+        "timeout_sec": 120,
+    },
+    {
+        "data_type": "research_report",
+        "name": "pywencai问财研报",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.wencai:PywencaiReportCollector",
+        "params_template": {"query": "最新研报", "cookie": ""},
+        "role": "主源",
+        "priority": 1,
+        "qps_limit": 0.5,
+        "timeout_sec": 120,
+    },
+    {
+        "data_type": "research_report",
+        "name": "akshare-东财研报（备用）",
+        "impl_kind": "py_func",
+        "impl_ref": "app.collectors.research:AkshareReportCollector",
+        "params_template": {},
+        "role": "备用",
+        "priority": 2,
+        "qps_limit": 0.5,
+        "timeout_sec": 60,
+    },
 ]
 
 
