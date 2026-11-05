@@ -275,6 +275,21 @@
 > - 7 要素固定 Prompt，缺一即不合格；关键数值与结构化输入比对（同义字段名 + 2% 容差），
 >   不合格时带问题清单重试一次。
 
+> **T7.4 落地口径**（实现 `backend/app/services/report.py`）：
+> - 统一生成流水线 `generate_and_store(db, report_type, report_date, *, llm=None, max_attempts=2, allow_skeleton_fallback=True)`：
+>   结构化输入 → 模板层生成（不合格带问题清单重试至多 `max_attempts` 次）→ 校验通过后入库。
+> - **入库 / 版本痕迹**：按「type + report_date」定位记录，存在则覆盖 `title` / `md_content` 并
+>   `version += 1`、刷新 `generated_at`；不存在则新建 `version = 1`（同类型同日仅一条，不新增记录）。
+> - **失败不落库**：重试用尽仍不合格 → 抛 `502`（消息含「已自动重试 N 次」+ 问题清单），
+>   不写库、不覆盖旧报告；经统一执行器在 `task_log` 留 `failed` 痕迹。
+> - **LLM 未就绪降级**：`AppError` 且 code∈`LLM_UNAVAILABLE_CODES(503)` 时输出结构化骨架
+>   （`FALLBACK_NOTE` 标注、字段口径与 LLM 正文一致；盘后骨架同样落规则化情绪分），接口不整体失败，
+>   并写 `task_log` `warning`；返回体 `llm_used` 标记是否真走 LLM。
+> - **调度入口**：`job_generate_morning(db, run_date=None)` / `job_generate_afternoon(db, run_date=None)`
+>   （签名 `fn(db, **kwargs)`，随 T7.5 接线 APScheduler）。
+> - `/api/report/regenerate` 接真流水线，响应新增 `ok` / `attempts` / `fallback` / `llm_used` / `problems`；
+>   `report_type` 非法返回 `400`。
+
 **机制**：结构化数据 + 固定 Prompt → LLM 生成 Markdown 报告 → 写入数据库 → 前端直接渲染。支持手动重新生成单日报告。
 
 ### 模块 4：选股模块
@@ -460,7 +475,7 @@
 | GET | /api/dashboard/market | 大盘首页数据 |
 | GET | /api/report/list | 报告列表 |
 | GET | /api/report/{id} | 单篇报告详情 |
-| POST | /api/report/regenerate | 重新生成指定日期报告 |
+| POST | /api/report/regenerate | 重新生成指定日期报告（走 LLM 流水线，响应含 `ok`/`attempts`/`fallback`/`llm_used`/`problems`；校验重试用尽→502，LLM 未就绪→骨架降级） |
 | POST | /api/selector/scan | 执行选股扫描 |
 | POST | /api/backtest/run | 提交回测任务 |
 | GET | /api/backtest/{id} | 获取回测状态/进度/结果（含 progress 进度字段） |
