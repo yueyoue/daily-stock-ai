@@ -225,6 +225,8 @@
 - 账号：单管理员账号（用户名 + 密码哈希存储），支持修改密码；不做注册/多用户（二期规划）
 - 登录接口限速：连续失败 5 次锁定 10 分钟（防暴力破解）
 - 会话：登录签发 token（HttpOnly Cookie 或 Bearer），有效期 7 天，可主动退出
+- **免鉴权白名单（T8.5 收口）**：仅 `/api/health`（健康检查）与 `/api/auth/login`（登录取 token）；其余 `/api/*` 一律需登录，含 `/api/docs`、`/api/openapi.json`
+- 接口文档开关 `API_DOCS_ENABLED`：代码默认 `true`（开发浏览接口、T3.1「OpenAPI 可浏览」依赖）；**生产置 `false`** → 不注册 docs/openapi 路由且白名单不再含它们，未登录访问 `/api/docs` 直接 401（`.env.example` 模板默认即 `false`）
 - 生产环境全站 HTTPS（宝塔 SSL / 飞牛反代），密码不明文过网
 
 ---
@@ -544,7 +546,8 @@
 - 登录鉴权覆盖全部 API（3.4）：登录口令 + 会话 + 登录限速 + 会话过期
 - 生产环境 HTTPS（宝塔 SSL）；反代 Basic Auth 可作额外兜底
 - LLM API Key 仅经 `.env` 环境变量注入，不入库、不回显前端
-- `.env` 加入 `.gitignore`，不进镜像层（构建参数与运行时环境变量分离）
+- `.env` 加入 `.gitignore` 与根目录 `.dockerignore`（排除 `.env`/`.env.*`/`.git`，保留 `!.env.example`），不进镜像层（构建参数与运行时环境变量分离）
+- **T8.5 落地口径**：自查脚本 `backend/scripts/security_selfcheck.py`——A 全 API 未登录逐个试 → 401（递归展开新版 FastAPI `_IncludedRouter`，否则枚举为空会假通过；并上 OpenAPI paths 兜底）、B 白名单收敛（仅 health/login，docs 随 `API_DOCS_ENABLED` 关）、C LLM Key 只进不出（仅尾 4 位掩码）、D 登录限速 429、E `.env` 不进 git 与镜像层、F 跟踪文件 + 近 200 提交 `sk-*`/`AKIA*`/`PRIVATE KEY` 扫描；退出码 0。回归测试 `backend/tests/test_security_selfcheck.py`（7 项）。HTTPS / 反代 / 实机登录页等项随 T8.3 宝塔验收执行
 
 ### 8.5 备份与恢复
 - 每日 `mysqldump`（飞牛计划任务 / 宝塔计划任务）：`docker exec dsa-mysql mysqldump -udsa -p"$DB_PASSWORD" daily_stock_ai | gzip > dsa_$(date +%F).sql.gz`，保留 7 天
