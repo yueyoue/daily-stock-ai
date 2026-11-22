@@ -16,6 +16,7 @@ from app.api.datasource import router as datasource_router
 from app.api.deps import require_user
 from app.api.health import router as health_router
 from app.api.hot import router as hot_router
+from app.api.model import router as model_router
 from app.api.news import router as news_router
 from app.api.report import router as report_router
 from app.api.selector import router as selector_router
@@ -97,6 +98,7 @@ app.include_router(collect_router, dependencies=[Depends(require_user)])
 app.include_router(dashboard_router, dependencies=[Depends(require_user)])
 app.include_router(report_router, dependencies=[Depends(require_user)])
 app.include_router(selector_router, dependencies=[Depends(require_user)])
+app.include_router(model_router, dependencies=[Depends(require_user)])
 app.include_router(backtest_router, dependencies=[Depends(require_user)])
 app.include_router(hot_router, dependencies=[Depends(require_user)])
 app.include_router(news_router, dependencies=[Depends(require_user)])

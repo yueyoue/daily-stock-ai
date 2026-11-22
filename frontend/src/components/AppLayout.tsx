@@ -13,6 +13,7 @@ const MENU = [
   { key: '/morning', label: <NavLink to="/morning">盘前早报</NavLink> },
   { key: '/afternoon', label: <NavLink to="/afternoon">盘后复盘</NavLink> },
   { key: '/selector', label: <NavLink to="/selector">选股器</NavLink> },
+  { key: '/model', label: <NavLink to="/model">估值模型</NavLink> },
   { key: '/backtest', label: <NavLink to="/backtest">策略回测</NavLink> },
   { key: 'grp-mat', label: '素材库', type: 'group' as const },
   { key: '/hot', label: <NavLink to="/hot">热点题材库</NavLink> },

@@ -393,3 +393,88 @@ export const newsApi = {
 export const healthApi = {
   check: () => request<{ status: string }>('/api/health'),
 }
+
+// ---------- 估值模型（边风炜估值选股） ----------
+export type ModelVerdict = 'pass' | 'watch' | 'reject'
+
+export interface ModelCheck {
+  factor: string
+  op: string
+  /** between 为 [lo,hi]；其余为数值阈值；signal 为提示项 */
+  target: number | [number, number] | string
+  value: number | null
+  pass: boolean | null
+  skipped: boolean
+  reason?: string
+}
+
+export interface ModelItem {
+  code: string
+  name: string
+  industry: string
+  style: string
+  style_label: string
+  score: number
+  verdict: ModelVerdict
+  decision: string
+  credibility: number
+  credibility_verdict: ModelVerdict
+  red_flags: string[]
+  checks: ModelCheck[]
+  position: number | null
+  band: { factor: string; low: number; high: number }
+  reasons: string[]
+  valuation?: Record<string, number | string | null>
+  report_date?: string | null
+  rules_note?: string
+}
+
+export interface ModelScanResult {
+  model: string
+  meta: {
+    trade_date: string | null
+    rows: number
+    pe_type: string
+    note: string
+    stats: { total: number; pass: number; watch: number; reject: number }
+    filtered: number
+    risk_free: number
+    div_premium: number
+  }
+  items: ModelItem[]
+  notes: string[]
+}
+
+export interface ModelRules {
+  model: string
+  weights: Record<string, number>
+  risk_free: number
+  div_premium: number
+  gate: { reject_below: number; watch_below: number }
+  styles: Array<{
+    style: string
+    label: string
+    hard: Array<[string, string, number | [number, number]]>
+    band: [string, number, number]
+    note: string
+    degraded?: boolean
+    observe_only?: boolean
+  }>
+}
+
+export const modelApi = {
+  rules: () => request<ModelRules>('/api/model/rules'),
+  scan: (payload: {
+    trade_date?: string
+    style?: string
+    verdict?: ModelVerdict
+    limit?: number
+  }) =>
+    request<ModelScanResult>('/api/model/scan', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  evaluate: (code: string) => request<ModelItem & { meta: ModelScanResult['meta'] }>(
+    `/api/model/evaluate/${encodeURIComponent(code)}`,
+  ),
+}
