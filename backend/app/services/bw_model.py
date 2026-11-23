@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date
 
 from sqlalchemy.orm import Session
@@ -26,6 +27,15 @@ from app.services.valuation import build_snapshot, industry_map
 logger = logging.getLogger("app.bw_model")
 
 MODEL_VERSION = "bw-value-v1.0"
+
+# 全市场扫描结果缓存（秒）：避免每次打开页面/切风格/切档位都重跑一遍全市场评估
+SCAN_CACHE_TTL = 600
+_SCAN_CACHE: dict[str, tuple] = {}  # key -> (ts, meta, results, stats)
+
+
+def invalidate_cache() -> None:
+    """数据变更（补采/回填）后主动失效。"""
+    _SCAN_CACHE.clear()
 
 # 无风险利率（%）：股息率门槛的基准，可在系统配置覆盖
 DEFAULT_RISK_FREE = 1.8
@@ -196,8 +206,13 @@ GATE_EXEMPT = {
 
 
 def credibility(metrics: dict, style: str = "other") -> dict:
-    """财报可信度评分（0~100）+ 红旗清单。仅用库内已有指标，不做造假定性。"""
+    """财报可信度评分（0~100）+ 红旗清单；数据不足时返回 unknown，不伪装满分。"""
     exempt = GATE_EXEMPT.get(style, set())
+    present = [f for f, *_ in GATE_RULES if _num(metrics.get(f)) is not None]
+    py0, oy0 = _num(metrics.get("profit_yoy")), _num(metrics.get("ocf_yoy"))
+    if not present and not (py0 is not None and oy0 is not None):
+        return {"score": None, "verdict": "unknown", "red_flags": []}
+
     score = 100.0
     reds: list[str] = []
     for factor, threshold, penalty, desc in GATE_RULES:
@@ -206,33 +221,26 @@ def credibility(metrics: dict, style: str = "other") -> dict:
         v = _num(metrics.get(factor))
         if v is None:
             continue
-        if factor in ("ocf_to_profit",):
-            hit = v < threshold
-        else:
-            # 扣非比、负债率、速动比率：阈值以下扣分（速动比率同样越低越差）
-            hit = v < threshold
-        if hit:
+        if v < threshold:
             score += penalty
             reds.append(f"{desc}（{factor}={v:.2f}）")
 
-    # 利润与现金流背离：利润为正增长而经营现金流为负增长
-    py, oy = _num(metrics.get("profit_yoy")), _num(metrics.get("ocf_yoy"))
-    if py is not None and oy is not None and py > 0 and oy < 0:
+    if py0 is not None and oy0 is not None and py0 > 0 and oy0 < 0:
         score -= 15.0
-        reds.append(f"利润与现金流背离（profit_yoy={py:.1f}%，ocf_yoy={oy:.1f}%）")
+        reds.append(f"利润与现金流背离（profit_yoy={py0:.1f}%，ocf_yoy={oy0:.1f}%）")
 
     score = max(0.0, min(100.0, score))
     verdict = "reject" if score < GATE_REJECT else ("watch" if score < GATE_WATCH else "pass")
     return {"score": round(score, 1), "verdict": verdict, "red_flags": reds}
 
 
-# ---------- 第 2 层：分项评分 ----------
+
 def _score_valuation(style: str, v: dict) -> float:
+    """估值分（40 分）：按当前值在风格区间中的位置给分，越靠下沿分越高。"""
     band = RULES.get(style, RULES["other"])["band"]
     factor, lo, hi = band
     pos = _position(v.get(factor), lo, hi)
     if pos is None:
-        # 兜底：用 pb 或 pe 任一可用
         for alt in ("pe_annualized", "pb", "ps"):
             if v.get(alt) is not None:
                 pos = 0.5
@@ -269,70 +277,83 @@ def _score_growth(v: dict) -> float:
 
 # ---------- 主评估 ----------
 def evaluate_one(code: str, name: str, industry: str, v: dict) -> dict:
-    """单票评估：返回档位、分数、逐条命中、区间位置与理由。"""
+    """单票评估：档位、分数、逐条命中、区间位置与理由（修正版判定）。"""
     style = style_of(industry)
     rule = RULES.get(style, RULES["other"])
     gate = credibility(v, style)
     checks: list[dict] = []
-    hard_all_pass = True
-    hard_total = hard_pass = 0
+    hard_total = hard_pass = hard_skipped = 0
 
     for factor, op, target in rule["hard"]:
         val = _num(v.get(factor))
         ok = _cmp(val, op, target)
         hard_total += 1
         if ok is None:
+            hard_skipped += 1
             checks.append({"factor": factor, "op": op, "target": target, "value": None,
                            "pass": None, "skipped": True,
                            "reason": "数据缺失，门槛跳过（不视为通过）"})
             continue
         if ok:
             hard_pass += 1
-        else:
-            hard_all_pass = False
         checks.append({"factor": factor, "op": op, "target": target,
                        "value": round(val, 4), "pass": bool(ok), "skipped": False})
 
-    # 现金流背离单独列为提示项（不参与门槛，但影响可信度）
     py, oy = _num(v.get("profit_yoy")), _num(v.get("ocf_yoy"))
     if py is not None and oy is not None and py > 0 and oy < 0:
         checks.append({"factor": "ocf_yoy", "op": "signal", "target": ">0",
                        "value": round(oy, 2), "pass": False, "skipped": False,
                        "reason": "利润正增长但现金流负增长（背离）"})
 
-    score = (_score_valuation(style, v) + _score_quality(v)
-             + _score_cashflow(v) + _score_growth(v))
+    # 评分：有数据的分项按实际计，缺失分项给中性 50%，再按数据完整度降权
+    has_val = any(v.get(k) is not None for k in ("pe_annualized", "pb", "ps"))
+    has_qua = v.get("roe") is not None or v.get("deduct_ratio") is not None
+    has_cf = v.get("ocf_to_profit") is not None
+    has_g = v.get("revenue_yoy") is not None
+
+    s_val = _score_valuation(style, v) if has_val else WEIGHTS["valuation"] * 0.5
+    s_qua = _score_quality(v) if has_qua else WEIGHTS["quality"] * 0.5
+    s_cf = _score_cashflow(v) if has_cf else WEIGHTS["cashflow"] * 0.5
+    s_g = _score_growth(v) if has_g else WEIGHTS["growth"] * 0.5
+    score = s_val + s_qua + s_cf + s_g
+
+    data_ratio = sum(1 for x in (has_qua, has_cf, has_g, v.get("revenue_yoy") is not None)) / 4.0
+    score *= 0.55 + 0.45 * data_ratio
 
     factor_band, lo, hi = rule["band"]
     pos = _position(v.get(factor_band), lo, hi)
 
-    # 关键估值门槛不满足 → 直接排除（"贵了就是贵了"，不给观察档）
     critical_fail = [c for c in checks
                      if c.get("pass") is False and c.get("factor") in CRITICAL_FACTORS]
 
-    # 档位判定：gate 优先 → 关键门槛 → 硬门槛 → 分数
     if rule.get("observe_only"):
         verdict = "watch"
         decision = "观察：该风格不参与评分（" + rule["note"] + "）"
     elif gate["verdict"] == "reject":
         verdict = "reject"
         decision = "排除：财报可信度不足（" + "；".join(gate["red_flags"][:2]) + "）"
+    elif hard_pass == 0:
+        verdict = "reject"
+        decision = "排除：无任何硬门槛被实际满足（%d 条中 %d 条缺数据）" % (hard_total, hard_skipped)
     elif critical_fail:
         f = critical_fail[0]
         verdict = "reject"
         decision = "排除：估值不在区间（%s %s %s，实际 %s）" % (
             f["factor"], f["op"], f["target"], f["value"])
-    elif hard_all_pass:
-        verdict = "pass" if score >= 65 else "watch"
-        decision = "通过：" + ("全部门槛满足" if verdict == "pass" else "门槛满足但综合分偏低")
-    elif hard_pass >= max(1, hard_total - 1) and score >= 45:
+    elif hard_pass == hard_total and hard_skipped == 0 and score >= 70:
+        verdict = "pass"
+        decision = "通过：全部门槛满足且综合分达标"
+    elif score >= 45:
         verdict = "watch"
-        decision = "观察：仅少数门槛未达（%d/%d）" % (hard_pass, hard_total)
+        decision = "观察：门槛 %d/%d 满足（缺数据 %d 条），综合分 %s" % (
+            hard_pass, hard_total, hard_skipped, round(score, 1))
     else:
         verdict = "reject"
-        decision = "排除：硬门槛未达（%d/%d）" % (hard_pass, hard_total)
+        decision = "排除：综合分偏低（%s）" % round(score, 1)
 
     reasons: list[str] = []
+    if gate["verdict"] == "unknown":
+        reasons.append("财务指标缺失：财报可信度未评估（仅用快照估值）")
     if pos is not None:
         reasons.append(f"估值位于区间 {pos * 100:.0f}%（{factor_band} {lo:g}~{hi:g}）")
     if v.get("div_yield") is not None:
@@ -341,14 +362,15 @@ def evaluate_one(code: str, name: str, industry: str, v: dict) -> dict:
         reasons.append(f"PE(年化) {v['pe_annualized']:.1f}")
     if gate["red_flags"]:
         reasons.append("财报红旗：" + "；".join(gate["red_flags"][:2]))
-    if any(c.get("skipped") for c in checks):
-        reasons.append("部分门槛因数据缺失跳过")
+    if hard_skipped:
+        reasons.append(f"{hard_skipped} 条门槛因数据缺失未评估")
 
     return {
         "code": code, "name": name, "industry": industry, "style": style,
         "style_label": STYLE_LABEL.get(style, style),
         "score": round(score, 1), "verdict": verdict, "decision": decision,
-        "credibility": gate["score"], "credibility_verdict": gate["verdict"],
+        "credibility": gate["score"] if gate["score"] is not None else "未评估",
+        "credibility_verdict": gate["verdict"],
         "red_flags": gate["red_flags"],
         "checks": checks,
         "position": round(pos, 4) if pos is not None else None,
@@ -361,33 +383,44 @@ def evaluate_one(code: str, name: str, industry: str, v: dict) -> dict:
     }
 
 
+
 def scan(db: Session, trade_date: date | None = None, style: str | None = None,
-         verdict: str | None = None, limit: int = 200) -> dict:
-    """全市场扫描：构建估值快照 → 逐票评估 → 过滤/排序。"""
-    snap = build_snapshot(db, trade_date=trade_date)
-    rows = snap["rows"]
-    info = industry_map(db, list(rows.keys()))
+         verdict: str | None = None, limit: int = 200, refresh: bool = False) -> dict:
+    """全市场扫描：构建估值快照 → 逐票评估 → 过滤/排序（结果按交易日缓存 TTL）。"""
+    key = trade_date.isoformat() if trade_date else "auto"
+    now = time.time()
+    hit = _SCAN_CACHE.get(key)
+    cached = bool(hit and not refresh and (now - hit[0]) < SCAN_CACHE_TTL)
+    if cached:
+        _, snap_meta, results, stats = hit
+    else:
+        snap = build_snapshot(db, trade_date=trade_date)
+        rows = snap["rows"]
+        info = industry_map(db, list(rows.keys()))
 
-    results: list[dict] = []
-    for code, v in rows.items():
-        name, ind = info.get(code, ("", ""))
-        results.append(evaluate_one(code, name, ind, v))
+        results = []
+        for code, v in rows.items():
+            name, ind = info.get(code, ("", ""))
+            results.append(evaluate_one(code, name, ind, v))
 
-    stats = {"total": len(results), "pass": 0, "watch": 0, "reject": 0}
-    for r in results:
-        stats[r["verdict"]] = stats.get(r["verdict"], 0) + 1
+        stats = {"total": len(results), "pass": 0, "watch": 0, "reject": 0}
+        for r in results:
+            stats[r["verdict"]] = stats.get(r["verdict"], 0) + 1
+        snap_meta = snap["meta"]
+        _SCAN_CACHE[key] = (now, snap_meta, results, stats)
 
     picked = results
     if style:
         picked = [r for r in picked if r["style"] == style]
     if verdict:
         picked = [r for r in picked if r["verdict"] == verdict]
-    picked.sort(key=lambda r: (-r["score"], r["code"]))
+    picked = sorted(picked, key=lambda r: (-r["score"], r["code"]))
 
     return {
         "model": MODEL_VERSION,
-        "meta": {**snap["meta"], "stats": stats, "filtered": len(picked),
-                 "risk_free": DEFAULT_RISK_FREE, "div_premium": DIV_PREMIUM},
+        "meta": {**snap_meta, "stats": stats, "filtered": len(picked),
+                 "risk_free": DEFAULT_RISK_FREE, "div_premium": DIV_PREMIUM,
+                 "cached": cached},
         "items": picked[:limit],
         "notes": [
             "演示口径：PE 默认用「最新报告期年化」，与静态 PE 不可混用",

@@ -31,6 +31,7 @@ class ScanRequest(BaseModel):
     style: str | None = Field(default=None, description="风格过滤：bank/utility/consumer/cyclical/growth/insurance/property")
     verdict: str | None = Field(default=None, description="档位过滤：pass/watch/reject")
     limit: int = Field(default=200, ge=1, le=2000)
+    refresh: bool = Field(default=False, description="忽略扫描缓存，强制重算")
 
 
 @router.get("/rules")
@@ -53,7 +54,8 @@ def model_scan(payload: ScanRequest, db: Session = Depends(get_db)):
     if payload.verdict and payload.verdict not in ("pass", "watch", "reject"):
         raise AppError(400, "verdict 仅支持 pass/watch/reject")
     return bw_model.scan(db, trade_date=trade_date, style=payload.style,
-                         verdict=payload.verdict, limit=payload.limit)
+                         verdict=payload.verdict, limit=payload.limit,
+                         refresh=payload.refresh)
 
 
 @router.get("/evaluate/{code}")
