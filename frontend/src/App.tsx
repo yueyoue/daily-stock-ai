@@ -9,6 +9,7 @@ import AfternoonPage from './pages/AfternoonPage'
 import TaskPage from './pages/TaskPage'
 import ConfigPage from './pages/ConfigPage'
 import SelectorPage from './pages/SelectorPage'
+import ModelPage from './pages/ModelPage'
 import BacktestPage from './pages/BacktestPage'
 import HotPage from './pages/HotPage'
 import NewsPage from './pages/NewsPage'
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/morning" element={<MorningPage />} />
             <Route path="/afternoon" element={<AfternoonPage />} />
             <Route path="/selector" element={<SelectorPage />} />
+            <Route path="/model" element={<ModelPage />} />
             <Route path="/backtest" element={<BacktestPage />} />
             <Route path="/hot" element={<HotPage />} />
             <Route path="/watch" element={<WatchPage />} />

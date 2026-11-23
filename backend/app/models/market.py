@@ -52,6 +52,7 @@ class StockFinance(Base):
     code: Mapped[str] = mapped_column(String(12), primary_key=True)
     report_date: Mapped[date] = mapped_column(Date, primary_key=True)  # 报告期
     report_type: Mapped[str] = mapped_column(String(16), default="quarterly")
+    announce_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # 最新公告日期（回测 as-of 用）
     total_revenue: Mapped[float | None] = mapped_column(Float, nullable=True)
     net_profit: Mapped[float | None] = mapped_column(Float, nullable=True)
     operating_cashflow: Mapped[float | None] = mapped_column(Float, nullable=True)

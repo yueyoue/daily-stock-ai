@@ -16,6 +16,7 @@ from app.api.datasource import router as datasource_router
 from app.api.deps import require_user
 from app.api.health import router as health_router
 from app.api.hot import router as hot_router
+from app.api.model import router as model_router
 from app.api.news import router as news_router
 from app.api.report import router as report_router
 from app.api.selector import router as selector_router
@@ -53,6 +54,24 @@ async def lifespan(app: FastAPI):
             logger.info("定时调度已启动（TZ=%s，§4.9）", settings.timezone)
         else:
             logger.warning("定时调度未启用（SCHEDULER_ENABLED=false）")
+        # 预热：后台线程先把估值扫描结果算好并进缓存，避免用户首次打开「估值模型」
+        # 页面时撞上冷缓存（全市场 5,500 只 × 财报 JSON，冷启动约 40~80s）
+        import threading
+
+        def _warm_model_cache() -> None:
+            from app.models.base import SessionLocal as _SL
+            from app.services import bw_model as _bw
+
+            _db = _SL()
+            try:
+                _bw.scan(_db, limit=1)
+                logger.info("估值模型扫描缓存预热完成")
+            except Exception as exc:  # 预热失败不影响启动
+                logger.warning("估值模型扫描缓存预热失败：%s", exc)
+            finally:
+                _db.close()
+
+        threading.Thread(target=_warm_model_cache, name="model-warmup", daemon=True).start()
     finally:
         db.close()
     try:
@@ -97,6 +116,7 @@ app.include_router(collect_router, dependencies=[Depends(require_user)])
 app.include_router(dashboard_router, dependencies=[Depends(require_user)])
 app.include_router(report_router, dependencies=[Depends(require_user)])
 app.include_router(selector_router, dependencies=[Depends(require_user)])
+app.include_router(model_router, dependencies=[Depends(require_user)])
 app.include_router(backtest_router, dependencies=[Depends(require_user)])
 app.include_router(hot_router, dependencies=[Depends(require_user)])
 app.include_router(news_router, dependencies=[Depends(require_user)])
