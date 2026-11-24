@@ -24,6 +24,7 @@
 | `batch_{1..4}_val.pkl.gz` | 同上 | ~16MB | 每日估值 PE/PB/股本/行业 | Batch1✅ |
 | `batch_{1..4}_days.pkl.gz` | 同上 | ~14MB | 日级特征（命中率测算表） | Batch1✅ |
 | `batch_{1..4}_waves.csv` | CSV | ~1.2MB | 主升浪波段+启动前特征 | Batch1✅ |
+| `batch_{n}_inc{k}_kline*.pkl.gz` | pandas pickle(gzip) | 0.2~5MB/个 | 已抓日线**增量快照**（write-once，≤30分钟粒度） | 防环境销毁丢抓取进度；`09_restore_cache` 可识别；批次完整归档产出后冗余可删 |
 | `fin_all.pkl.gz` | pandas pickle(gzip) | 6.1MB | 定期业绩 2022年报~2026三季报 | ✅ 一次性 |
 | `universe.csv` | CSV | ~0.2MB | 全A 5223 只清单 | ✅ |
 | `index_sh.pkl` | pandas pickle | ~0.2MB | 上证指数日线 2021-01 起 | ✅ |
