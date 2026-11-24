@@ -66,3 +66,9 @@
 - **接手环境工具重建（原 `.openclaw/tmp/stock-analysis/` 下，不入仓）**：`paced_fetch.py`（节流续抓）与
   `inc_snapshot.py`（增量快照导出：batch_{n}_inc{k}_kline*.pkl.gz，write-once，09 可识别）按上文机制
   重建；`git-cred-helper.sh`（sync 推送凭据 helper，凭据零暴露）随环境新建。
+- **接手环境网络限制（2026-11-24 19:25 诊断）**：本机访问东财 push2\* 族（push2his/push2/push2delay，
+  http+https、全部分片、多个 CDN 边缘 IP、IPv6）均建立连接后被断（Empty reply），与请求头无关；
+  同时段 datacenter-web、quote.eastmoney.com、腾讯行情、百度均 200 正常。推断为 push2\* 服务侧
+  对本机 IP 的限流/拦截。paced_fetch 以~30s 探活等待恢复（恢复后自动续抓，无空磨）；若长时间
+  不恢复，需用户决策：继续等待（口径纯净）或换源（腾讯 fqkline 可达但无成交额列，无法复现
+  amt_d 口径，不建议）。
