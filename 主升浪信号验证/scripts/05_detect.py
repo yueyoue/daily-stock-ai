@@ -182,8 +182,14 @@ def process_stock(sym, code, fin_df):
 
 
 def main():
-    uni = load_universe()
+    uni = load_universe().sort_values('symbol').reset_index(drop=True)
     fin_df = pd.read_csv(CACHE / 'fin' / 'fin_all.csv', dtype={'code': str})
+    sl = None
+    if '--slice' in sys.argv:
+        a, b = sys.argv[sys.argv.index('--slice') + 1].split(':')
+        sl = (int(a), int(b))
+        uni = uni.iloc[sl[0]:sl[1]]
+    print('batch stocks:', len(uni), flush=True)
     all_rows, n_day = [], 0
     for k, (sym, code) in enumerate(zip(uni.symbol, uni.code)):
         try:
@@ -201,9 +207,18 @@ def main():
             print(f'{k+1}/{len(uni)} waves={len(all_rows)} dayfiles={n_day}', flush=True)
     w = pd.DataFrame(all_rows)
     if len(w):
-        name_map = dict(zip(uni.code, uni.name))
+        name_map = dict(zip(load_universe().code, load_universe().name))
         w['name'] = w['code'].map(name_map)
-        w.to_csv(CACHE / 'waves.csv', index=False)
+    # 合并历史波段（按批次增量累加）
+    old_p = CACHE / 'waves.csv'
+    if old_p.exists():
+        old = pd.read_csv(old_p, dtype={'code': str})
+        batch_codes = set(uni.code)
+        old = old[~old.code.isin(batch_codes)]
+        w = pd.concat([old, w], ignore_index=True)
+        w = w.sort_values(['code', 'start_date']).reset_index(drop=True)
+    if len(w):
+        w.to_csv(old_p, index=False)
     print('DONE waves:', len(w), 'stocks_with_waves:', (w.code.nunique() if len(w) else 0))
 
 

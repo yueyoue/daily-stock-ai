@@ -10,6 +10,9 @@ cd 主升浪信号验证
 bash resume.sh          # 自动按顺序续跑，已抓数据自动跳过
 ```
 
+**分批测试（推荐，见 TEST_PLAN.md）**：每 1500 只一批，抓完即测、测完即推送 GitHub；
+每批产物 `results/batch_*_{waves.csv,days.parquet,kline.parquet}` 均已入仓，环境销毁后可免重抓恢复。
+
 或分步手动执行（全部可中断、可重复执行，已抓取的个股数据不会重抓）：
 
 ```bash
@@ -30,10 +33,13 @@ python3 07_cases_check.py        # 15 案例校准对照
 | `README.md` | 本文件：续跑指南 |
 | `PROGRESS.md` | 进度快照与中间结论（每次中断前更新） |
 | `METHOD.md` | 测试方法、数据源、口径定义 |
+| `TEST_PLAN.md` | 分批测试计划与环境销毁后的恢复流程 |
+| `BATCH_LOG.md` | 各批次测试结果与结论对照（持续累积） |
 | `resume.sh` | 一键续跑脚本 |
-| `scripts/` | 01~07 全部代码（05_detect.py 为核心识别器） |
-| `results/` | 校准与统计输出（cases_recheck.csv 等） |
-| `tables/` | 06_stats.py 输出的验证统计表 |
+| `sync_github.sh` | 推送本文件夹到 GitHub 仓库（凭据内部读取） |
+| `scripts/` | 01~09 全部代码（05_detect.py 为核心识别器） |
+| `results/` | 每批产物：波段特征/日级特征/日线数据 + 案例校准 |
+| `tables/` | 06_stats.py 输出的累计验证统计表 |
 
 ## 数据缓存（不在 git 内，位于本机工作区）
 
