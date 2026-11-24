@@ -21,5 +21,14 @@
 - 新发现的特征/结论按 CONCLUSIONS.md 现有格式追加
 - 4 批全部完成后：写 验证报告.md、更新 CONCLUSIONS.md、推送
 
-工作目录：~/.openclaw/workspace/主升浪信号验证/（数据缓存在 ../.openclaw/tmp/stock-analysis/cache/）
+四、工作目录与环境（重要，两种场景区分）：
+- 源头是 GitHub 仓库，不是某个本地路径。新环境第一步：
+  git clone https://github.com/yueyoue/daily-stock-ai.git && cd daily-stock-ai/主升浪信号验证/scripts
+  脚本会在仓库内自动建数据缓存目录，无需手动配置；先把 results/ 归档恢复成缓存（免重抓）：
+  python3 09_restore_cache.py
+- 若接手环境就是原 OpenClaw 沙箱（工作区 ~/.openclaw/workspace/，缓存在
+  ~/.openclaw/workspace/.openclaw/tmp/stock-analysis/cache/）：缓存可能还在，直接续跑，
+  跑之前先用 DATA.md 第六节核对缓存数量；若缓存已丢失同样走上面 clone+restore 流程
 ```
+
+> 说明：本提示词里的 GitHub 仓库是唯一事实源；`~/.openclaw/workspace/...` 仅在原沙箱内有效。
