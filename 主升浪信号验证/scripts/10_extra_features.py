@@ -54,7 +54,7 @@ def stock_features(df, val, idx):
     ret = pd.Series(c).pct_change()
     F['vol20'] = ret.rolling(20).std().to_numpy()
     F['vol60'] = ret.rolling(60).std().to_numpy()
-    tr = pd.concat([h - l, (pd.Series(h) - pd.Series(c).shift()).abs(),
+    tr = pd.concat([pd.Series(h - l), (pd.Series(h) - pd.Series(c).shift()).abs(),
                     (pd.Series(l) - pd.Series(c).shift()).abs()], axis=1).max(axis=1)
     F['atr20_pct'] = (tr.rolling(20).mean() / c)
     # RSI14
