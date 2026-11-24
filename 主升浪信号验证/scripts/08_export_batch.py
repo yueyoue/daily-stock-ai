@@ -15,6 +15,14 @@ RES = Path(__file__).resolve().parent.parent / 'results'
 RES.mkdir(exist_ok=True)
 
 
+def save_df(df, stem):
+    """优先 parquet，无引擎时回退 pickle.gz（09_restore 两种都认）。"""
+    try:
+        df.to_parquet(stem.with_suffix('.parquet'), index=False, compression='zstd')
+    except ImportError:
+        df.to_pickle(stem.with_suffix('.pkl.gz'), compression='gzip')
+
+
 def main():
     a, b, n = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
     uni = load_universe().sort_values('symbol').reset_index(drop=True).iloc[a:b]
@@ -39,7 +47,7 @@ def main():
         dd['date'] = dd['date'].str.replace('-', '').astype('int32')
         for c in ['fwd60', 'dist250', 'amt_ratio', 'pe_pct_2y']:
             dd[c] = dd[c].astype('float32')
-        dd.to_parquet(RES / f'batch_{n}_days.parquet', index=False, compression='zstd')
+        save_df(dd, RES / f'batch_{n}_days')
 
     # 3) 前复权日线
     kl = []
@@ -54,12 +62,12 @@ def main():
         kk['date'] = kk['date'].str.replace('-', '').astype('int32')
         for c in ['open', 'close', 'high', 'low', 'volume', 'amount']:
             kk[c] = kk[c].astype('float32')
-        kk.to_parquet(RES / f'batch_{n}_kline.parquet', index=False, compression='zstd')
+        save_df(kk, RES / f'batch_{n}_kline')
 
     import os
     for f in sorted(RES.glob(f'batch_{n}_*')):
         print(f.name, round(os.path.getsize(f) / 1e6, 1), 'MB')
-    print('waves rows:', len(wb), 'day rows:', len(day_parts and dd or []), 'kline stocks:', len(kl))
+    print('waves rows:', len(wb), 'day rows:', (len(dd) if day_parts else 0), 'kline stocks:', len(kl))
 
 
 if __name__ == '__main__':

@@ -12,8 +12,9 @@ def main():
     uni = load_universe()
     sym_of = dict(zip(uni.code, uni.symbol))
     n = 0
-    for p in sorted(res.glob('batch_*_kline.parquet')):
-        df = pd.read_parquet(p)
+    files = sorted(res.glob('batch_*_kline.parquet')) + sorted(res.glob('batch_*_kline.pkl.gz'))
+    for p in files:
+        df = pd.read_parquet(p) if p.suffix == '.parquet' else pd.read_pickle(p)
         for code, g in df.groupby('code'):
             sym = sym_of.get(str(code))
             if not sym:

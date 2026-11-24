@@ -104,7 +104,7 @@ def main():
     # 业绩与涨幅关系
     v = w.dropna(subset=['profit_yoy'])
     if len(v) > 30:
-        rho = v.profit_yoy.corr(v.gain_high, method='spearman')
+        rho = v.profit_yoy.rank().corr(v.gain_high.rank())   # Spearman（免 scipy）
         overview.loc[len(overview)] = {'指标': 'Spearman(净利同比, 波段涨幅)', '值': round(rho, 3), '备注': f'n={len(v)}'}
     for tag, m in [('净利同比<0', v.profit_yoy < 0), ('净利同比0~30%', (v.profit_yoy >= 0) & (v.profit_yoy < 30)),
                    ('净利同比>=30%', v.profit_yoy >= 30)]:

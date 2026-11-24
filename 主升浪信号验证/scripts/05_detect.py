@@ -159,7 +159,10 @@ def process_stock(sym, code, fin_df):
     rows = []
     for (i, peak, end) in waves:
         fin = fl.asof(A['dates'][i])
-        rows.append(wave_features(A, i, peak, end, fin))
+        w = wave_features(A, i, peak, end, fin)
+        w['code'] = code
+        w['symbol'] = sym
+        rows.append(w)
     day_df = None
     n = len(df)
     dates = A['dates']
@@ -190,24 +193,31 @@ def main():
         sl = (int(a), int(b))
         uni = uni.iloc[sl[0]:sl[1]]
     print('batch stocks:', len(uni), flush=True)
+    (CACHE / 'wrows').mkdir(exist_ok=True)
     all_rows, n_day = [], 0
     for k, (sym, code) in enumerate(zip(uni.symbol, uni.code)):
+        wp = CACHE / 'wrows' / f'{code}.pkl'
+        fp = CACHE / 'features' / f'{code}.pkl'
         try:
-            rows, day_df = process_stock(sym, code, fin_df)
+            if wp.exists() and fp.exists():
+                rows = pd.read_pickle(wp).to_dict('records')
+            else:
+                rows, day_df = process_stock(sym, code, fin_df)
+                if rows:
+                    pd.DataFrame(rows).to_pickle(wp)
+                if day_df is not None:
+                    day_df.to_pickle(fp)
         except Exception as e:
             print('ERR', sym, repr(e)[:120])
             continue
-        for r in rows:
-            r['symbol'] = sym
         all_rows += rows
-        if day_df is not None:
-            day_df.to_pickle(CACHE / 'features' / f'{code}.pkl')
-            n_day += 1
+        n_day += 1 if fp.exists() else 0
         if (k + 1) % 300 == 0:
             print(f'{k+1}/{len(uni)} waves={len(all_rows)} dayfiles={n_day}', flush=True)
     w = pd.DataFrame(all_rows)
     if len(w):
-        name_map = dict(zip(load_universe().code, load_universe().name))
+        nm = load_universe()
+        name_map = dict(zip(nm.code, nm.name))
         w['name'] = w['code'].map(name_map)
     # 合并历史波段（按批次增量累加）
     old_p = CACHE / 'waves.csv'
