@@ -57,3 +57,12 @@
 - **东财 push2his 限速**：被限速时连接直接被断（原 02 会每票空磨 8 次重试）。接手环境用节流驱动
   `.openclaw/tmp/stock-analysis/paced_fetch.py` 续抓（探活+冷却+自适应降速，复用 02 抓取函数，同口径）。
   限速 empty 不落缓存文件，无数据损坏，幂等可重抓。
+- **接手环境数据丢失与恢复（2026-11-24 18:42 校准）**：原沙箱销毁时未归档活缓存随之丢失——DATA.md
+  原批次表 Batch2 的 1343/1500、Batch3 的 8/1500、各批 raw 2/4/8 均为销毁前活缓存计数，实际仅
+  `batch_2_inc1` 快照（9 只）与 Batch1 完整归档存活。已按 `09_restore_cache.py` + 归档补恢复：
+  日线 1508/5223、val 1500 只（batch_1_val 归档）、features 1483 只（batch_1_days 归档，口径注：
+  float32 精度同 DATA.md 第四节第 3 条）、waves 3805 段/1384 只、fin 138,156 行——与 Batch1 归档及
+  BATCH_LOG 数字交叉验证一致。Batch2~4 缺口（前复权 3714 只）用 paced_fetch 节流重抓，03 补抓估值。
+- **接手环境工具重建（原 `.openclaw/tmp/stock-analysis/` 下，不入仓）**：`paced_fetch.py`（节流续抓）与
+  `inc_snapshot.py`（增量快照导出：batch_{n}_inc{k}_kline*.pkl.gz，write-once，09 可识别）按上文机制
+  重建；`git-cred-helper.sh`（sync 推送凭据 helper，凭据零暴露）随环境新建。
