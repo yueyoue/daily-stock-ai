@@ -43,9 +43,19 @@
 - 批次间差异大（如分年度命中率）→ 如实报告失效条件，不做过度概括
 - 与原报告口径差异（成交额来源、复权方式）在报告中显式标注
 
-## 抓取数据的耐久性
+## 抓取数据的耐久性（全部归档 GitHub，后续测指标免重抓）
+
+| 数据 | 位置 | 单批大小 | 全量预计 |
+|---|---|---|---|
+| 前复权日线（OHLCV+真实成交额） | `results/batch_*_kline.*` | ~23MB | ~85MB |
+| 估值历史（PE_TTM/PB/收盘/股本/行业，2021-06起） | `results/batch_*_val.*` | ~16MB | ~60MB |
+| 日级特征（fwd60/距高点/量比/PE分位） | `results/batch_*_days.*` | ~14MB | ~50MB |
+| 波段及启动前特征 | `results/batch_*_waves.csv` | ~1.2MB | ~5MB |
+| 定期业绩（净利/ROE/毛利率/公告日，2022年报~2026三季报） | `results/fin_all.pkl.gz` | 一次性 6.1MB | ✅已归档 |
+| 不复权日线（对照口径） | `results/batch_*_kline_raw.*` | ~23MB | ~85MB（全量抓完后补归档） |
+
+GitHub 仓库总量预计 ~300MB，单文件均 <100MB 限制。以后测新指标：
+`git clone` → `python3 scripts/09_restore_cache.py`（或直接读 results/ 下的 parquet/pkl.gz）即可，无需任何重抓。
 
 - 逐票 pkl 缓存（本机）：断点续跑用，销毁即丢
-- `results/batch_*_kline.parquet`（GitHub）：耐久副本，单批 ~20-40MB
-- 估值/财务数据较小（几MB），也在每批导出时附带在 days.parquet 与 waves.csv 的特征列里；
-  如需全量重建：03 约 20 分钟、04 约 5 分钟
+- 估值/财务重建成本：03 约 20 分钟、04 约 5 分钟（如需）
