@@ -159,7 +159,8 @@ Batch1=0:1500、Batch2=1500:3000、Batch3=3000:4500、Batch4=4500:5223。
 1. 不复权日线抓齐（3824→5223）后：逐批重跑 `08_export_batch.py a b n` 补 raw 归档并推送
 2. 验证报告与 CONCLUSIONS 已基于全量样本更新（见 验证报告.md）；如需新指标直接用 results/ 数据
 3. 每日增量采集已自动化：GitHub Actions `data-fetch`（每交易日北京 01:30 自动；或手动 Run workflow，
-   可选 mode=both/qfq/raw 与 full_export=true 重导全量批次归档）→ `results/daily/YYYYMMDD_*.pkl.gz`
+   可选 mode=both/qfq/raw 与 full_export=true 重导全量批次归档）→ `results/daily/YYYYMMDD_*.pkl.gz`，
+   **详见 `DAILY_COLLECT.md`（每日自动采集功能文档）**
 
 ### 接手 AI 操作卡（照做即可，全部幂等可重复）
 

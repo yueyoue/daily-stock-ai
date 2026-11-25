@@ -1,9 +1,6 @@
 name: data-fetch
-# 每日自动采集当日收盘数据（数据仓库模式）：
-#   恢复缓存 → 增量补抓/刷新日线 → 导出每日增量归档 results/daily/ → 更新 DATA.md → 提交推送
-# 触发：定时（cron 为 UTC，17:30 = 北京时间次日 01:30，A股收盘数据已齐）或手动 workflow_dispatch。
-# 手动 full_export=true：额外重导全量批次归档 batch_*（如 raw 补齐后补归档；大提交，按需用）。
-# 幂等：重复跑不重复抓取/导出；某次跑空下次自动补（缓存过期自动重抓）。
+# 自动抓取：从 results/ 归档恢复缓存 → 增量补抓缺失日线 → 逐批导出归档 → 提交推送
+# 触发：手动（workflow_dispatch）或定时（美股时段，避开A股数据源高峰）
 on:
   workflow_dispatch:
     inputs:
@@ -11,10 +8,6 @@ on:
         description: '抓取模式：both / qfq / raw'
         required: false
         default: 'both'
-      full_export:
-        description: '同时重导全量批次归档（true/false，大提交按需）'
-        required: false
-        default: 'false'
   schedule:
     - cron: '30 17 * * 1-5'
 
@@ -30,27 +23,15 @@ jobs:
           python-version: '3.12'
 
       - name: Install deps
-        run: pip install pandas requests
+        run: pip install pandas requests pyarrow
 
       - name: Restore cache from repo archives
         run: python 主升浪信号验证/scripts/09_restore_cache.py 主升浪信号验证/results
 
-      - name: Fetch kline (idempotent, refreshes to today)
-        timeout-minutes: 90
-        continue-on-error: true          # 跑空/限速不阻塞导出，下次自动补（幂等）
+      - name: Fetch missing kline (resumable, skips existing)
         run: python 主升浪信号验证/scripts/02_fetch_kline.py ${{ github.event.inputs.mode || 'both' }}
 
-      - name: Fallback fetch qfq (sina/tencent, best-effort)
-        continue-on-error: true
-        run: |
-          pip install akshare
-          python 主升浪信号验证/scripts/14_fallback_sina.py
-
-      - name: Export daily increments to results/daily/
-        run: python 主升浪信号验证/scripts/15_export_daily.py
-
-      - name: Full batch re-export (optional, large commit)
-        if: github.event.inputs.full_export == 'true'
+      - name: Export all batches to results/
         run: |
           python 主升浪信号验证/scripts/08_export_batch.py 0 1500 1
           python 主升浪信号验证/scripts/08_export_batch.py 1500 3000 2
@@ -59,12 +40,12 @@ jobs:
 
       - name: Update DATA.md progress
         run: |
-          sed -i "s|^> 最后更新：.*|> 最后更新：$(date -u +%Y-%m-%d\ %H:%M) UTC（GitHub Actions 自动采集+归档）|" 主升浪信号验证/DATA.md
+          sed -i "s|^> 最后更新：.*|> 最后更新：$(date -u +%Y-%m-%d\ %H:%M) UTC（GitHub Actions 自动抓取+归档）|" 主升浪信号验证/DATA.md
 
       - name: Commit & push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A 主升浪信号验证/results 主升浪信号验证/DATA.md
-          git diff --cached --quiet || git commit -m "data: 自动采集归档 $(date -u +%F)"
+          git diff --cached --quiet || git commit -m "data: 自动抓取归档 $(date -u +%F)"
           git push
