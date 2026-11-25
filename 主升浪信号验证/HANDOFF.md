@@ -42,3 +42,11 @@
 - 日线兜底脚本：`14_fallback_sina.py`（腾讯/新浪源，自动跳过已有缓存）
 - 推送方式：`bash sync_github.sh "msg"`（凭据由 git-cred-helper 内部读取，不落盘不显示）
 - 40 分钟 cron 自动续跑提醒在岗（主升浪批次续跑），全部完成后需删除
+- 新环境（GitHub 克隆场景）跑 `sync_github.sh` 前需一次性搭好（幂等）：
+  ① 推送克隆：`git clone https://github.com/yueyoue/daily-stock-ai.git ~/.openclaw/workspace/.openclaw/tmp/daily-stock-ai`；
+  ② 工作目录软链：`ln -s ~/.openclaw/workspace/daily-stock-ai/主升浪信号验证 ~/.openclaw/workspace/主升浪信号验证`；
+  ③ 凭据 helper：`~/.openclaw/workspace/.openclaw/tmp/stock-analysis/git-cred-helper.sh`（git credential 协议，
+  get 模式输出 `username=x-access-token` 与 `password=<token文件内容>`，凭据零暴露）；token 放
+  `~/.openclaw/workspace/.openclaw/tmp/token.txt`（不入仓，任务结束建议轮换）。
+  环境工具在 `scripts/env_tools/`（paced_fetch/inc_snapshot/restore_extra/凭据 helper 模板）。
+  ⚠️ `sync_github.sh` 推送失败不返回非零 exit（掩码管道吞掉），推送后务必核对输出 `HEAD -> main`。

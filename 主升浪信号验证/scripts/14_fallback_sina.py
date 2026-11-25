@@ -11,6 +11,7 @@ from utils import CACHE, load_universe
 
 COLS = ['date', 'open', 'close', 'high', 'low', 'volume', 'amount']
 CHECK_ONLY = '--check' in sys.argv
+END = __import__('datetime').datetime.now(__import__('datetime').timezone.utc).strftime('%Y%m%d')  # 动态终点（每日增量）
 
 
 def good(path):
@@ -24,7 +25,7 @@ def good(path):
 
 def fetch_tx(sym):
     import akshare as ak
-    df = ak.stock_zh_a_hist_tx(symbol=sym, start_date='20220401', end_date='20261124', adjust='qfq')
+    df = ak.stock_zh_a_hist_tx(symbol=sym, start_date='20220401', end_date=END, adjust='qfq')
     if df is None or df.empty:
         return None
     out = pd.DataFrame({
@@ -41,7 +42,7 @@ def fetch_tx(sym):
 
 def fetch_sina(sym):
     import akshare as ak
-    df = ak.stock_zh_a_daily(symbol=sym, start_date='20220401', end_date='20261124', adjust='qfq')
+    df = ak.stock_zh_a_daily(symbol=sym, start_date='20220401', end_date=END, adjust='qfq')
     if df is None or df.empty:
         return None
     out = pd.DataFrame({

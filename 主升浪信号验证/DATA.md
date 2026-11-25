@@ -28,6 +28,7 @@
 | `universe.csv` | CSV | ~0.2MB | 全A 5223 只清单 | ✅ |
 | `index_sh.pkl` | pandas pickle | ~0.2MB | 上证指数日线 2021-01 起 | ✅ |
 | `cases_recheck.csv` | CSV | 4KB | 原报告 15 案例校准对照 | ✅ |
+| `daily/YYYYMMDD_kline*.pkl.gz` | pandas pickle(gzip) | ~0.3MB/日 | **每日增量日线**（自动采集，交易日一文件，write-once） | 2026-11-25 起，与基线归档按 (code,date) 去重合并读取 |
 
 批次划分（按 universe.csv 的 symbol 升序切片，固定不变）：
 Batch1=0:1500、Batch2=1500:3000、Batch3=3000:4500、Batch4=4500:5223。
@@ -45,6 +46,8 @@ Batch1=0:1500、Batch2=1500:3000、Batch3=3000:4500、Batch4=4500:5223。
 | amount | float32 | 成交额（**元**，真实值，来自东财） |
 
 区间 2022-04-01 ~ 2026-11-24（约 1126 根/股）。前复权锚定 2026-11-24。
+2026-11-25 起每日自动采集：全量归档保持 2026-11-24 基线不变，此后增量在 `results/daily/`
+（前复权锚定=抓取当日滚动，raw 无锚定问题；合并读取时按 (code,date) 去重）。
 
 ### batch_*_val.pkl.gz —— 每日估值
 | 列 | 类型 | 含义 |
@@ -129,7 +132,7 @@ Batch1=0:1500、Batch2=1500:3000、Batch3=3000:4500、Batch4=4500:5223。
 
 ## 六、抓取进度（每次抓取+推送后必须立即更新本节）
 
-> 最后更新：2026-11-25 09:05（4 批次全部完成；不复权归档：B1✅ B2✅ B3部分 B4待抓）
+> 最后更新：2026-11-25 09:40（每日自动采集已上线：GitHub Actions `data-fetch` 工作流；4 批次全部完成；不复权归档：B1✅ B2✅ B3部分 B4待抓）
 
 ### 数据集级进度
 
@@ -155,20 +158,20 @@ Batch1=0:1500、Batch2=1500:3000、Batch3=3000:4500、Batch4=4500:5223。
 
 1. 不复权日线抓齐（3824→5223）后：逐批重跑 `08_export_batch.py a b n` 补 raw 归档并推送
 2. 验证报告与 CONCLUSIONS 已基于全量样本更新（见 验证报告.md）；如需新指标直接用 results/ 数据
+3. 每日增量采集已自动化：GitHub Actions `data-fetch`（每交易日北京 01:30 自动；或手动 Run workflow，
+   可选 mode=both/qfq/raw 与 full_export=true 重导全量批次归档）→ `results/daily/YYYYMMDD_*.pkl.gz`
 
 ### 接手 AI 操作卡（照做即可，全部幂等可重复）
 
 ```bash
 cd 主升浪信号验证/scripts
-# 0. 前复权已全齐；若东财恢复想补不复权：python3 02_fetch_kline.py raw
-#    东财仍断连时用兜底：python3 14_fallback_sina.py（腾讯/新浪，自动跳过已有）
-# 1. 跑下一批测试（日线已齐可直接跑）：
-python3 05_detect.py --slice 3000:4500    # 换成对应批次切片（symbol 排序口径）
-python3 06_stats.py
-python3 08_export_batch.py 3000 4500 3
-# 2. 更新本文档「六、抓取进度」+ BATCH_LOG.md 该批结果
-# 3. 推送：
-bash ../sync_github.sh "batch3: 测试完成+数据归档"
+# 日常采集已自动化（data-fetch：恢复→补抓→results/daily/ 增量→提交推送）；本地手动：
+python3 02_fetch_kline.py both        # 补抓/刷新日线（过期缓存自动重抓，终点=当日）
+python3 14_fallback_sina.py           # 东财断连时兜底（腾讯/新浪，只补前复权）
+python3 15_export_daily.py            # 导出每日增量到 results/daily/（当日未收盘不导出）
+# raw 抓齐后补全量归档：python3 08_export_batch.py a b n（4 批各跑一次，或 Actions full_export=true）
+# 更新本文档「六」+ BATCH_LOG.md 后推送：
+bash ../sync_github.sh "msg"
 ```
 
 **铁律**：每次抓取有实质进展并推送后，**必须立即更新本节进度表**（数量+时间戳）；

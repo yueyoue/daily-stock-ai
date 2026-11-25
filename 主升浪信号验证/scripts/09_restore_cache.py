@@ -9,6 +9,13 @@ import pandas as pd
 
 def main():
     res = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent.parent / 'results'
+    # 新环境缓存为空时补种 universe.csv（load_universe 依赖；results 归档里有）——否则 FileNotFoundError
+    if not (CACHE / 'universe.csv').exists():
+        src = res / 'universe.csv'
+        if src.exists():
+            import shutil
+            shutil.copy(src, CACHE / 'universe.csv')
+            print('seeded cache/universe.csv from', src)
     uni = load_universe()
     sym_of = dict(zip(uni.code, uni.symbol))
     n = 0
@@ -27,7 +34,8 @@ def main():
                 if out.exists():
                     continue
                 g = g.drop(columns=['code']).copy()
-                g['date'] = g['date'].astype(str)
+                # 归档日期 int32(20220401) -> 流水线内部 ISO(2022-04-01)（FinLookup/估值reindex/窗口比较依赖）
+                g['date'] = pd.to_datetime(g['date'].astype(str)).dt.strftime('%Y-%m-%d')
                 g = g.sort_values('date').reset_index(drop=True)
                 g.to_pickle(out)
                 n += 1
