@@ -12,22 +12,26 @@ def main():
     uni = load_universe()
     sym_of = dict(zip(uni.code, uni.symbol))
     n = 0
-    files = sorted(res.glob('batch_*_kline.parquet')) + sorted(res.glob('batch_*_kline.pkl.gz'))
-    for p in files:
-        df = pd.read_parquet(p) if p.suffix == '.parquet' else pd.read_pickle(p)
-        for code, g in df.groupby('code'):
-            sym = sym_of.get(str(code))
-            if not sym:
-                continue
-            out = CACHE / 'kline' / f'{sym}.pkl'
-            if out.exists():
-                continue
-            g = g.drop(columns=['code']).copy()
-            g['date'] = g['date'].astype(str)
-            g = g.sort_values('date').reset_index(drop=True)
-            g.to_pickle(out)
-            n += 1
-        print(p.name, 'restored cumulative', n)
+    for sub, patterns in (('kline', ['batch_*_kline.parquet', 'batch_*_kline.pkl.gz']),
+                          ('raw_kline', ['batch_*_kline_raw.parquet', 'batch_*_kline_raw.pkl.gz'])):
+        files = []
+        for pat in patterns:
+            files += sorted(res.glob(pat))
+        for p in files:
+            df = pd.read_parquet(p) if p.suffix == '.parquet' else pd.read_pickle(p)
+            for code, g in df.groupby('code'):
+                sym = sym_of.get(str(code))
+                if not sym:
+                    continue
+                out = CACHE / sub / f'{sym}.pkl'
+                if out.exists():
+                    continue
+                g = g.drop(columns=['code']).copy()
+                g['date'] = g['date'].astype(str)
+                g = g.sort_values('date').reset_index(drop=True)
+                g.to_pickle(out)
+                n += 1
+            print(p.name, 'restored cumulative', n)
     print('DONE restored', n)
 
 if __name__ == '__main__':

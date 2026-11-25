@@ -43,6 +43,15 @@
 - 批次间差异大（如分年度命中率）→ 如实报告失效条件，不做过度概括
 - 与原报告口径差异（成交额来源、复权方式）在报告中显式标注
 
+## GitHub Actions 自动抓取（ci/data-fetch.yml → 仓库 .github/workflows/）
+
+- **定时**：每个交易日晚 17:30 UTC（北京时间次日 01:30）自动跑；也可在仓库 Actions 页手动 Run workflow
+- **流程**：从 results/ 归档恢复缓存 → 增量补抓缺失日线（幂等）→ 逐批导出归档 → 更新 DATA.md 第六节 → 自动 commit+push
+- **一次性前提**（仓库网页设置，仅需一次）：Settings → Actions → General → Workflow permissions →
+  勾选 **Read and write permissions**（否则机器人无权推送）
+- 限制：Actions 海外 IP 访问东财/腾讯可能被限速（已有重试+换源兜底）；只负责抓取归档，
+  主升浪识别/统计（05/06）仍按批次手动或由会话执行
+
 ## 抓取数据的耐久性（全部归档 GitHub，后续测指标免重抓）
 
 | 数据 | 位置 | 单批大小 | 全量预计 |

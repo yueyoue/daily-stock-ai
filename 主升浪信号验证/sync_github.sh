@@ -9,8 +9,12 @@ MSG="${1:-update: 进度同步}"
 
 mkdir -p "$REPO/主升浪信号验证"
 cp -r "$WS/主升浪信号验证/." "$REPO/主升浪信号验证/"
+if [ -d "$WS/主升浪信号验证/ci" ]; then
+  mkdir -p "$REPO/.github/workflows"
+  cp "$WS/主升浪信号验证/ci/"*.yml "$REPO/.github/workflows/"
+fi
 cd "$REPO" || exit 1
-git add -A 主升浪信号验证
+git add -A 主升浪信号验证 .github
 git -c user.name=openclaw-agent -c user.email=openclaw-agent@local commit -q -m "$MSG" 2>/dev/null
 BR=$(git rev-parse --abbrev-ref HEAD)
 GIT_TERMINAL_PROMPT=0 timeout 60 git -c credential.helper="$HELP" push origin "HEAD:$BR" 2>&1 \
