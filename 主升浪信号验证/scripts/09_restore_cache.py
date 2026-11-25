@@ -23,8 +23,7 @@ def main():
             if out.exists():
                 continue
             g = g.drop(columns=['code']).copy()
-            # 归档日期为 int32(20220401)，流水线内部为 ISO 字符串(2022-04-01)（FinLookup/估值reindex/窗口比较依赖）
-            g['date'] = pd.to_datetime(g['date'].astype(str)).dt.strftime('%Y-%m-%d')
+            g['date'] = g['date'].astype(str)
             g = g.sort_values('date').reset_index(drop=True)
             g.to_pickle(out)
             n += 1

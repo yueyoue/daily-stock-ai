@@ -32,3 +32,13 @@
 ```
 
 > 说明：本提示词里的 GitHub 仓库是唯一事实源；`~/.openclaw/workspace/...` 仅在原沙箱内有效。
+
+## 接手备忘（环境与坑，持续累积）
+
+- 本项目脚本自包含可移植：clone 仓库后直接跑，缓存自动建在 `<仓库上层>/.openclaw/tmp/stock-analysis/cache/`
+- 原沙箱缓存路径：`~/.openclaw/workspace/.openclaw/tmp/stock-analysis/cache/`（可能被销毁）
+- 网络坑：东财 push2his 主域被屏蔽/限速 → 用分片域名（1./33. 等）+ 重试；腾讯 web.ifzq 会 501 → 用 ifzq.gtimg.cn；
+  数据中心 datacenter-web.eastmoney.com 稳定可用（财务/估值）
+- 日线兜底脚本：`14_fallback_sina.py`（腾讯/新浪源，自动跳过已有缓存）
+- 推送方式：`bash sync_github.sh "msg"`（凭据由 git-cred-helper 内部读取，不落盘不显示）
+- 40 分钟 cron 自动续跑提醒在岗（主升浪批次续跑），全部完成后需删除
